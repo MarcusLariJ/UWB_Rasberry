@@ -11,8 +11,9 @@
  * @author DecaWave
  */
 
+// Added to to fix multiple definitions of dwt_lock
 #include <port.h>
-
+pthread_mutex_t dwt_lock;
 
 /****************************************************************************//**
  *

@@ -42,7 +42,8 @@ extern "C" {
 
 #define UNUSED(x) (void)(x)
 
-pthread_mutex_t dwt_lock;
+// Additional lines to fix multiple definitions of dwt_lock
+extern pthread_mutex_t dwt_lock;
 
 /* DW IC IRQ (EXTI15_10_IRQ) handler type. */
 typedef void (*port_dwic_isr_t)(void);

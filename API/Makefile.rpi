@@ -502,8 +502,8 @@ $(TEST_PROGRAMS):
 	$(eval PROG_OBJS:=$($(PROG)_OBJS))
 	$(eval PROG_BUILD_DIR:=$($(PROG)_BUILD_DIR))
 	@echo "Building target" $@ "..."
-	$(CC) $(CFLAGS) $(PROG_FLAGS) -o $(PROG_BUILD_DIR)/$@ $(EXE_LDFLAGS) \
-	$(SHARED_EX_OBJS) $(PROG_OBJS) -l$(NAME)
+	$(CC) $(CFLAGS) $(PROG_FLAGS) -o $(PROG_BUILD_DIR)/$@ \
+	$(SHARED_EX_OBJS) $(PROG_OBJS) -l$(NAME) $(EXE_LDFLAGS)
 
 # libdw3000
 # Rule to link objects together and create symlinks (for versioning).
