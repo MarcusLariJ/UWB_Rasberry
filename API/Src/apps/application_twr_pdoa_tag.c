@@ -151,7 +151,7 @@ int dw_twr_pdoa(void)
     twr_base_frame_t *rx_frame_pointer;
     twr_final_frame_t *rx_final_frame_pointer;
     int16_t sts_quality_index;
-    uint32_t last_sync_time = millis() // replaced HAL_GetTick();
+    uint32_t last_sync_time = millis(); // replaced HAL_GetTick();
 
     uint16_t current_rotation = 0;
     int8_t rotation_direction = 1;
@@ -172,7 +172,7 @@ int dw_twr_pdoa(void)
 	{
 		/* check timeout and restart ranging if necessary (if there is an overflow in the tick counter the difference
 		 * will overflow too and will trigger the timeout, but that shouldn't be much of an issue) */
-		if ((millis() - last_sync_time) > ranging_timeout) // replaced HAL_GetTick() {
+		if ((millis() - last_sync_time) > ranging_timeout) { 
 			dwt_forcetrxoff();  // make sure receiver is off after a timeout
 			last_sync_time = millis(); // replaced HAL_GetTick()
 			stdio_write("Timeout -> reset\n");

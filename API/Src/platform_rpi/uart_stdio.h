@@ -19,7 +19,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 
-extern FILE *log;
+extern FILE *logfile;
 
 /* Platform specific includes */
 //#include "stm32f4xx_hal.h"

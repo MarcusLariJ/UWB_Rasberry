@@ -158,7 +158,7 @@ int tx_wait_resp_int(void)
         /* Wait for any RX event. */
         while (tx_delay_ms == -1)
         { 
-            sleep(5); // small delay prevents the loop from getting stuck
+            Sleep(5); // small delay prevents the loop from getting stuck
         };
 
         /* Execute the defined delay before next transmission. */

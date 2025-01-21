@@ -24,7 +24,7 @@
 #include "main.h"
 
 //static UART_HandleTypeDef* uart = NULL;
-FILE  *log; 
+FILE  *logfile; 
 
 /*! ----------------------------------------------------------------------------
  * @fn port_stdio_init
@@ -33,7 +33,7 @@ FILE  *log;
  * @param[in] huart Pointer to the STM32 HAL UART peripheral instance
  */
 void stdio_init() {
-    log = fopen("log.txt", "w");
+    logfile = fopen("log.txt", "w");
 }
 
 /*! ----------------------------------------------------------------------------
@@ -46,7 +46,8 @@ void stdio_init() {
 inline int stdio_write(const char *data)
 {    
     uint16_t len = strlen(data);
-    fprintf(log, data);
+    fprintf(logfile, data);
+    printf("%s\n", data); // also print to console
     return len;
 
     /*
@@ -60,6 +61,7 @@ inline int stdio_write(const char *data)
 inline int stdio_write_binary(const uint8_t *data, uint16_t length)
 {
     // TODO: Implement
+    fputc(data[0], logfile);
     return length;
     /*
     if (HAL_UART_Transmit(uart, data, length, HAL_MAX_DELAY) == HAL_OK) {
