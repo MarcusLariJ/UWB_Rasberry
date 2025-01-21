@@ -11,9 +11,9 @@
  * @author DecaWave
  */
 
-// Added to to fix multiple definitions of dwt_lock
+// Added to to fix multiple definitions of dwt_lock. 
 #include <port.h>
-pthread_mutex_t dwt_lock;
+pthread_mutex_t dwt_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 
 /****************************************************************************//**
  *

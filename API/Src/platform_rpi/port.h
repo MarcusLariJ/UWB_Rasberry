@@ -19,6 +19,8 @@
 extern "C" {
 #endif
 
+#define _GNU_SOURCE // to access extra features of pthread
+
 #include <stdint.h>
 #include <string.h>
 

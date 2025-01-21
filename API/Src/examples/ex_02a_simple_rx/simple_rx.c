@@ -119,6 +119,11 @@ int simple_rx(void)
             if (frame_len <= FRAME_LEN_MAX)
             {
                 dwt_readrxdata(rx_buffer, frame_len-FCS_LEN, 0); /* No need to read the FCS/CRC. */
+
+                for (int i=0; i<10; i++){
+                    printf("%#04x ", (unsigned long ) rx_buffer[i]);
+                }
+                printf("\n");
             }
 
             /* Clear good RX frame event in the DW IC status register. */
