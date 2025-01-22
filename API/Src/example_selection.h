@@ -84,6 +84,14 @@ extern "C" {
 //#define TEST_FRAME_FILTERING_TX
 //#define TEST_FRAME_FILTERING_RX
 
+/* And the applications here: */
+#define APPLICATION_TWR_PDOA_TAG  // TWR tag with full data collection (double antenna module) => used for final measurements
+#define APPLICATION_TWR_ANCHOR    // TWR anchor (single antenna module) => used for final measurements
+
+/* Microsecond to device time unit (40-bit timestamps, around 15.65 ps) conversion factor.
+ * 1 µs = 499.2 * 128 dtu. */
+#define US_TO_DWT_TIME (63898)
+
 #ifdef __cplusplus
 }
 #endif
