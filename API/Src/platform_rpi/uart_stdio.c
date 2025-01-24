@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "uart_stdio.h"
 
@@ -34,6 +35,7 @@ FILE  *logfile;
  */
 void stdio_init() {
     logfile = fopen("log.txt", "w");
+    assert(logfile != NULL);
 }
 
 /*! ----------------------------------------------------------------------------
@@ -47,7 +49,8 @@ inline int stdio_write(const char *data)
 {    
     uint16_t len = strlen(data);
     fprintf(logfile, data);
-    printf("%s\n", data); // also print to console
+    fflush(logfile);
+    printf("%s", data); // also print to console
     return len;
 
     /*
@@ -60,8 +63,23 @@ inline int stdio_write(const char *data)
 
 inline int stdio_write_binary(const uint8_t *data, uint16_t length)
 {
-    // TODO: Implement
-    fputc(data[0], logfile);
+    uint8_t mask;
+    for (int i=0; i<length; i++){
+        mask = 128;
+        for (int j=0; j<8; j++){
+            if ((mask & data[i]) > 0)
+            {
+                fputc('1', logfile);
+            } 
+            else  
+            {
+                fputc('0', logfile);
+            }
+            mask = mask >> 1;
+        }
+    }
+    fputc('\n', logfile);
+    fflush(logfile);
     return length;
     /*
     if (HAL_UART_Transmit(uart, data, length, HAL_MAX_DELAY) == HAL_OK) {

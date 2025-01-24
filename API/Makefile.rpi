@@ -22,9 +22,7 @@ PREFIX := /usr/lib
 
 SRC_DIR := Src
 EXAMPLES_DIR := examples
-APP_DIR := apps
 TEST_DIR := $(SRC_DIR)/$(EXAMPLES_DIR)
-APP_TEST_DIR := $(SRC_DIR)/$(APP_DIR)
 OUTPUT_DIR := ./output
 
 EXE_SRCS :=Src/main_rpi.c \
@@ -33,15 +31,15 @@ $(shell find ./$(TEST_DIR)/examples_info -name *.c)
 APP_TWR_ANCHOR:=app_twr_anchor
 APP_TWR_ANCHOR_FLAGS:=-DAPP_TWR_ANCHOR
 APP_TWR_ANCHOR_SRCS:=$(EXE_SRCS) \
-$(APP_TEST_DIR)/application_twr_anchor.c
-APP_TWR_ANCHOR_BUILD_DIR:=$(OUTPUT_DIR)
+$(TEST_DIR)/app_00a_twr_anchor/application_twr_anchor.c
+APP_TWR_ANCHOR_BUILD_DIR:=$(OUTPUT_DIR)/app_00a_twr_anchor
 APP_TWR_ANCHOR_OBJS:=$(APP_TWR_ANCHOR_SRCS:%=$(APP_TWR_ANCHOR_BUILD_DIR)/%.o)
 
 APP_TWR_PDOA:=app_twr_pdoa
 APP_TWR_PDOA_FLAGS:=-DAPP_TWR_PDOA
 APP_TWR_PDOA_SRCS:=$(EXE_SRCS) \
-$(APP_TEST_DIR)/application_twr_pdoa_tag.c
-APP_TWR_PDOA_BUILD_DIR:=$(OUTPUT_DIR)
+$(TEST_DIR)/app_00b_twr_pdoa_tag/application_twr_pdoa_tag.c
+APP_TWR_PDOA_BUILD_DIR:=$(OUTPUT_DIR)/app_00b_twr_pdoa_tag
 APP_TWR_PDOA_OBJS:=$(APP_TWR_PDOA_SRCS:%=$(APP_TWR_PDOA_BUILD_DIR)/%.o)
 
 TEST_READING_DEV_ID:=test_reading_dev_id
@@ -476,8 +474,8 @@ $(TEST_GPIO) \
 $(TEST_OTP_WRITE) \
 $(TEST_LE_PEND_TX) \
 $(TEST_LE_PEND_RX) \
-$(APP_TWR_ANCHOR) \
-$(APP_TWR_PDOA)
+$(APP_TWR_PDOA) \
+$(APP_TWR_ANCHOR)
 
 .PHONY: all
 all: $(LIB_DIR)/$(LIB_NAME) \

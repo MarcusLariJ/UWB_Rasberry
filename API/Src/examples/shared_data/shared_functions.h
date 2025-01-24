@@ -94,6 +94,20 @@ void final_msg_get_ts(const uint8_t *ts_field, uint32_t *ts);
 void final_msg_set_ts(uint8_t *ts_field, uint64_t ts);
 void resp_msg_set_ts(uint8_t *ts_field, const uint64_t ts);
 
+//------------------------------------------------------------------------------------------------------------------
+
+/*Functions imported from the paper for the applications*/
+
+//------------------------------------------------------------------------------------------------------------------
+
+/* Decode a 24-bit number stored in a 3-byte uint8_t array */
+int32_t decode_24bit(const uint8_t* buffer);
+
+/* Decode a 40-bit number stored in a 5-byte uint8_t array */
+uint64_t decode_40bit_timestamp(const uint8_t buffer[5]);
+
+/* Rotate the stepper motor */
+void rotate_reciever(int degrees);
 
 
 #ifdef __cplusplus

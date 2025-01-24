@@ -20,17 +20,17 @@ void build_examples(void)
 {
     unsigned char test_cnt=0;
 
-#ifdef APPLICATION_TWR_PDOA_TAG
-    extern int dw_twr_pdoa(void);
+#ifdef APP_TWR_PDOA
+    extern int application_twr_pdoa_tag(void);
 
-    example_pointer=dw_twr_pdoa;
+    example_pointer=application_twr_pdoa_tag;
     test_cnt++;
 #endif
 
-#ifdef APPLICATION_TWR_ANCHOR
-    extern int dw_twr_anchor(void);
+#ifdef APP_TWR_ANCHOR
+    extern int application_twr_anchor(void);
 
-    example_pointer=dw_twr_anchor;
+    example_pointer=application_twr_anchor;
     test_cnt++;
 #endif
 
