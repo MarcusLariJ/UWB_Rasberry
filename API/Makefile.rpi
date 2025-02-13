@@ -427,7 +427,7 @@ LD_INC_FLAGS := $(addprefix -L,$(LD_INC_DIRS))
 
 CFLAGS= -g -fPIC -Wall -Wextra -pedantic -std=c11 -D _DEFAULT_SOURCE -DRPI_BUILD -O2 -Os -g \
 -pipe -W -fstack-clash-protection -fstack-protector
-EXE_LDFLAGS=$(LD_INC_FLAGS) -fPIC -lwiringPi -Wl,-O1 -Wl,-z,defs -Wl,-z,now
+EXE_LDFLAGS=$(LD_INC_FLAGS) -fPIC -lwiringPi -Wl,-O1 -Wl,-z,defs -Wl,-z,now -lm
 
 # List of simple examples to build. Edit this list to change which executables are built.
 TEST_PROGRAMS:=$(TEST_READING_DEV_ID) \

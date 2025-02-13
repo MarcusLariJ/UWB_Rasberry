@@ -112,7 +112,7 @@ int simple_rx_pdoa(void)
             sprintf((char *)&pdoa_message_data,"PDOA val = %d",last_pdoa_val);
             test_run_info((unsigned char *)&pdoa_message_data);
         }
-
+        Sleep(5); // fixes stuck loop
     }
     return DWT_SUCCESS;
 }
@@ -136,7 +136,7 @@ static void rx_ok_cb(const dwt_cb_data_t *cb_data)
     UNUSED(cb_data);
 #endif //NRF52840_XXAA
     //checking STS quality see note 4
-    if(dwt_readstsquality(&cpqual))
+    if(dwt_readstsquality(&cpqual) >= 0) // set to larger than zero instead of equal to 1
     {
         pdoa_val=dwt_readpdoa();
     }

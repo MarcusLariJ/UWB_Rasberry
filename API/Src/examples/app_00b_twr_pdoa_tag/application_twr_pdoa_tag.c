@@ -18,12 +18,17 @@
 #include "uart_stdio.h"
 #include <wiringPi.h> // for getting time in milliseconds
 #include <assert.h> // for static_assert
+# include <math.h> // for calculating aoa
 
 #include "application_config.h"
 #include "shared_functions.h"
 
 
 #if defined(APP_TWR_PDOA)
+
+/* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */
+#define TX_ANT_DLY 16385
+#define RX_ANT_DLY 16385
 
 static void tx_done_cb(const dwt_cb_data_t *cb_data);
 static void rx_ok_cb(const dwt_cb_data_t *cb_data);
@@ -129,6 +134,10 @@ int application_twr_pdoa_tag(void)
     }
 
     stdio_write("CONFIGURED\n");
+
+	/* Apply default antenna delay value. See NOTE 1 below. */
+    dwt_setrxantennadelay(RX_ANT_DLY);
+    dwt_settxantennadelay(TX_ANT_DLY);
 
     /* Register RX call-back. */
     dwt_setcallbacks(tx_done_cb, rx_ok_cb, rx_err_cb, rx_err_cb, NULL, NULL);
@@ -252,7 +261,7 @@ int application_twr_pdoa_tag(void)
 
 				/* Transmit measurement data */
 				transmit_rx_diagnostics();
-				transmit_cir();
+				//transmit_cir();
 
 				/* Accept frame and continue ranging */
 				next_sequence_number++;
@@ -331,7 +340,7 @@ int application_twr_pdoa_tag(void)
 
 				/* Transmit measurement data */
 				transmit_rx_diagnostics();
-				transmit_cir();
+				//transmit_cir();
 
 				/* Accept frame continue with ranging */
 				next_sequence_number++;
@@ -466,7 +475,7 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data)
 void transmit_rx_diagnostics() {
 	dwt_rxdiag_t rx_diag = {0};
 	dwt_readdiagnostics(&rx_diag);
-
+	/*
 	static_assert(sizeof(meas_time_poa_t) == 44);
 	stdio_write("BLOB / toa / v3 / 43\n");
 	meas_time_poa_t poa_time_blob;
@@ -522,6 +531,19 @@ void transmit_rx_diagnostics() {
 	cir_analysis_blob.accum_count = rx_diag.sts2AccumCount;
 	stdio_write_binary((uint8_t*)&cir_analysis_blob, 24);
 	stdio_write("\n");
+	*/
+	
+	// Readable pdoa stuff
+	float pdoa_read = ((float)rx_diag.pdoa / (1 << 11));
+
+	snprintf(print_buffer, sizeof(print_buffer), "raw pdoa: %.6f, ",  pdoa_read);
+	stdio_write(print_buffer);
+	// angle
+	float eq_lamb = 4.6196;
+	float eq_d = 2.31;
+	float eq_aoa = asinf((pdoa_read*eq_lamb)/(2*M_PI*eq_d)) * (180/M_PI);
+	snprintf(print_buffer, sizeof(print_buffer), "aoa: %.6f \n",  eq_aoa);
+	stdio_write(print_buffer); 
 }
 
 void transmit_cir() {
