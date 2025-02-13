@@ -259,7 +259,7 @@ int application_twr_anchor(void)
 				tx_timestamp_final = rx_timestamp_response + round_tx_delay;
 
 				uint64_t Tround1 = rx_timestamp_response - tx_timestamp_poll;
-				uint64_t Treply2 = tx_timestamp_final - rx_timestamp_response;
+				uint64_t Treply2 = (tx_timestamp_final + TX_ANT_DLY) - rx_timestamp_response; // remember to add antenna delay for this timestamp specifically
 
 				final_frame.poll_resp_round_time[0] = (uint8_t)Tround1;
 				final_frame.poll_resp_round_time[1] = (uint8_t)(Tround1 >> 8);
