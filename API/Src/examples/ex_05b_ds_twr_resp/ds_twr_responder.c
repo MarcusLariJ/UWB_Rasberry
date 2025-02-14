@@ -89,7 +89,7 @@ static uint32_t status_reg = 0;
 /* Receive final timeout. See NOTE 5 below. */
 #define FINAL_RX_TIMEOUT_UUS 220
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
-#define PRE_TIMEOUT 5
+#define PRE_TIMEOUT 8
 
 /* Timestamps of frames transmission/reception. */
 static uint64_t poll_rx_ts;

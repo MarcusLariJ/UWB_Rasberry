@@ -90,7 +90,7 @@ static uint32_t status_reg = 0;
 /* Receive response timeout. See NOTE 5 below. */
 #define RESP_RX_TIMEOUT_UUS 300
 /* Preamble timeout, in multiple of PAC size. See NOTE 7 below. */
-#define PRE_TIMEOUT 5
+#define PRE_TIMEOUT 8
 
 /* Time-stamps of frames transmission/reception, expressed in device time units. */
 static uint64_t poll_tx_ts;
