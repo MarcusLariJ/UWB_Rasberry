@@ -239,6 +239,10 @@ int ds_twr_initiator(void)
         }
         else
         {
+            if (status_reg & SYS_STATUS_ALL_RX_TO)
+            {
+                printf("Timeout detected\n");
+            }
             /* Clear RX error/timeout events in the DW IC status register. */
             dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR | SYS_STATUS_TXFRS_BIT_MASK);
         }
