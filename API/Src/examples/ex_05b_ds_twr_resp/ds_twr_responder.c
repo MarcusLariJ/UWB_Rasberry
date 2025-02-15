@@ -87,7 +87,7 @@ static uint32_t status_reg = 0;
 /* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW IC's wait for response feature. */
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 500
 /* Receive final timeout. See NOTE 5 below. */
-#define FINAL_RX_TIMEOUT_UUS 220
+#define FINAL_RX_TIMEOUT_UUS 420
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
 #define PRE_TIMEOUT 8
 
@@ -280,6 +280,10 @@ int ds_twr_responder(void)
                 }
                 else
                 {
+                    if (status_reg & SYS_STATUS_ALL_RX_TO)
+                    {
+                        printf("Timeout detected (inner loop)\n");
+                    }
                     /* Clear RX error/timeout events in the DW IC status register. */
                     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
                 }
@@ -289,7 +293,7 @@ int ds_twr_responder(void)
         {
             if (status_reg & SYS_STATUS_ALL_RX_TO)
             {
-                printf("Timeout detected\n");
+                printf("Timeout detected (outer loop)\n");
             }
             /* Clear RX error/timeout events in the DW IC status register. */
             dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);

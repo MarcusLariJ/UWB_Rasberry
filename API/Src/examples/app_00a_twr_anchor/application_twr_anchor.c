@@ -23,10 +23,6 @@
 
 #if defined(APP_TWR_ANCHOR)
 
-/* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */
-#define TX_ANT_DLY 16385
-#define RX_ANT_DLY 16385
-
 static void tx_done_cb(const dwt_cb_data_t *cb_data);
 static void rx_ok_cb(const dwt_cb_data_t *cb_data);
 static void rx_err_cb(const dwt_cb_data_t *cb_data);
@@ -117,10 +113,6 @@ int application_twr_anchor(void)
     }
 
     stdio_write("CONFIGURED\n");
-
-	/* Apply default antenna delay value. See NOTE 1 below. */
-    dwt_setrxantennadelay(RX_ANT_DLY);
-    dwt_settxantennadelay(TX_ANT_DLY);
 
     /* Register RX call-back. */
     dwt_setcallbacks(tx_done_cb, rx_ok_cb, rx_err_cb, rx_err_cb, NULL, NULL);
@@ -259,7 +251,7 @@ int application_twr_anchor(void)
 				tx_timestamp_final = rx_timestamp_response + round_tx_delay;
 
 				uint64_t Tround1 = rx_timestamp_response - tx_timestamp_poll;
-				uint64_t Treply2 = (tx_timestamp_final + TX_ANT_DLY) - rx_timestamp_response; // remember to add antenna delay for this timestamp specifically
+				uint64_t Treply2 = tx_timestamp_final - rx_timestamp_response;
 
 				final_frame.poll_resp_round_time[0] = (uint8_t)Tround1;
 				final_frame.poll_resp_round_time[1] = (uint8_t)(Tround1 >> 8);
