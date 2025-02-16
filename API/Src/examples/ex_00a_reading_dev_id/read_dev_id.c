@@ -52,6 +52,12 @@ int read_dev_id(void)
     	test_run_info((unsigned char *)"DEV ID FAILED");
     }
 
+    // read the hopefully unique chip ID number
+    uint32_t OTP_buffer[2];
+    uint16_t OTP_addr = 0x06;
+    uint8_t OTP_len = 2;
+    dwt_otpread(OTP_addr, OTP_buffer, OTP_len);
+
     return err;
 }
 

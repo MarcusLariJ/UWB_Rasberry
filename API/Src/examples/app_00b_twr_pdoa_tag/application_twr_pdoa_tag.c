@@ -18,7 +18,7 @@
 #include "uart_stdio.h"
 #include <wiringPi.h> // for getting time in milliseconds
 #include <assert.h> // for static_assert
-# include <math.h> // for calculating aoa
+#include <math.h> // for calculating aoa
 
 #include "application_config.h"
 #include "shared_functions.h"
@@ -88,7 +88,7 @@ enum state_t state = TWR_SYNC_STATE;
 /* timeout before the ranging exchange will be abandoned and restarted */
 const static int ranging_timeout = 1000;
 
-void transmit_rx_diagnostics();
+void transmit_rx_diagnostics(uint16_t current_rotation);
 void transmit_cir();
 
 /**
@@ -97,7 +97,7 @@ void transmit_cir();
 int application_twr_pdoa_tag(void)
 {
     stdio_init();
-	stdio_write("DW3000 TEST TWR Tag\n");
+	printf("DW3000 TEST TWR Tag\n");
 
     /* Configure SPI rate, DW IC supports up to 38 MHz */
     port_set_dw_ic_spi_fastrate();
@@ -112,11 +112,11 @@ int application_twr_pdoa_tag(void)
 
     if (dwt_initialise(DWT_DW_INIT) == DWT_ERROR)
     {
-    	stdio_write("INIT FAILED\n");
+    	printf("INIT FAILED\n");
         while (1) { };
     }
 
-    stdio_write("INITIALIZED\n");
+    printf("INITIALIZED\n");
 
     /* Enabling LEDs here for debug so that for each RX-enable the D2 LED will flash on DW3000 red eval-shield boards. */
     dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);
@@ -124,12 +124,12 @@ int application_twr_pdoa_tag(void)
     /* Configure DW IC. */
     if(dwt_configure(&config)) /* if the dwt_configure returns DWT_ERROR either the PLL or RX calibration has failed the host should reset the device */
     {
-    	stdio_write("CONFIG FAILED\n");
+    	printf("CONFIG FAILED\n");
         while (1)
         { };
     }
 
-    stdio_write("CONFIGURED\n");
+    printf("CONFIGURED\n");
 
     /* Register RX call-back. */
     dwt_setcallbacks(tx_done_cb, rx_ok_cb, rx_err_cb, rx_err_cb, NULL, NULL);
@@ -161,7 +161,7 @@ int application_twr_pdoa_tag(void)
     uint16_t twr_count = 0;
     uint8_t full_rotation_count = 0;
 
-    stdio_write("Wait 3s before starting...");
+    printf("Wait 3s before starting...");
     Sleep(3000);
 
 #ifdef ROTATE
@@ -169,7 +169,7 @@ int application_twr_pdoa_tag(void)
 #else
 	snprintf(print_buffer, sizeof(print_buffer), "Config: twr/angle: -\n");
 #endif
-	stdio_write(print_buffer);
+	printf(print_buffer);
 
 	while (1)
 	{
@@ -178,7 +178,7 @@ int application_twr_pdoa_tag(void)
 		if ((millis() - last_sync_time) > ranging_timeout) { 
 			dwt_forcetrxoff();  // make sure receiver is off after a timeout
 			last_sync_time = millis(); // replaced HAL_GetTick()
-			stdio_write("Timeout -> reset\n");
+			printf("Timeout -> reset\n");
 			state = TWR_SYNC_STATE;
 			rx_timestamp_poll = 0;
 			tx_timestamp_response = 0;
@@ -199,14 +199,14 @@ int application_twr_pdoa_tag(void)
 			int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 			if (r != DWT_SUCCESS) {
 				state = TWR_ERROR;
-				stdio_write("TX ERR: could not send sync frame");
+				printf("TX ERR: could not send sync frame");
 				continue;
 			}
 			break;
 		case TWR_POLL_RESPONSE_STATE:
 			if (tx_done == 1) {
 				tx_done = 2;
-				stdio_write("TX: Sync frame\n");
+				printf("TX: Sync frame\n");
 			}
 
 			/* Wait for poll frame (2/4) */
@@ -214,14 +214,14 @@ int application_twr_pdoa_tag(void)
 				rx_done = 0; /* reset */
 
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
-					stdio_write("RX ERR: wrong frame length\n");
+					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
-					stdio_write("RX ERR: bad STS quality\n");
+					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR;
 					continue;
 				}
@@ -231,28 +231,28 @@ int application_twr_pdoa_tag(void)
 				rx_frame_pointer = (twr_base_frame_t *)rx_buffer;
 
 				if (rx_frame_pointer->twr_function_code != 0x21) { /* poll */
-					stdio_write("RX ERR: wrong frame (expected poll)\n");
+					printf("RX ERR: wrong frame (expected poll)\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
-					stdio_write("RX ERR: wrong sequence number\n");
+					printf("RX ERR: wrong sequence number\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
-				stdio_write("RX: Poll frame\n");
+				printf("RX: Poll frame\n");
 
 				dwt_readrxtimestamp(timestamp_buffer);
 				rx_timestamp_poll = decode_40bit_timestamp(timestamp_buffer);
 
 				/* Marker for serial output parsing script*/
 				snprintf(print_buffer, sizeof(print_buffer), "New Frame: poll: %u\n", next_sequence_number);
-				stdio_write(print_buffer);
+				printf(print_buffer);
 
 				/* Transmit measurement data */
-				transmit_rx_diagnostics();
+				transmit_rx_diagnostics(current_rotation);
 				//transmit_cir();
 
 				/* Accept frame and continue ranging */
@@ -274,7 +274,7 @@ int application_twr_pdoa_tag(void)
 				dwt_setdelayedtrxtime((uint32_t)((rx_timestamp_poll + round_tx_delay) >> 8));
 				int r = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
-					stdio_write("TX ERR: delayed send time missed\n");
+					printf("TX ERR: delayed send time missed\n");
 					state = TWR_ERROR;
 					continue;
 				}
@@ -283,7 +283,7 @@ int application_twr_pdoa_tag(void)
 		case TWR_FINAL_STATE:
 			if (tx_done == 1) {
 				tx_done = 2;
-				stdio_write("TX: Response frame\n");
+				printf("TX: Response frame\n");
 				dwt_readtxtimestamp(timestamp_buffer);
 				tx_timestamp_response = decode_40bit_timestamp(timestamp_buffer);
 			}
@@ -293,14 +293,14 @@ int application_twr_pdoa_tag(void)
 				rx_done = 0; /* reset */
 
 				if (new_frame_length != sizeof(twr_final_frame_t)+2) {
-					stdio_write("RX ERR: wrong frame length\n");
+					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
-					stdio_write("RX ERR: bad STS quality\n");
+					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR;
 					continue;
 				}
@@ -310,28 +310,28 @@ int application_twr_pdoa_tag(void)
 				rx_frame_pointer = (twr_base_frame_t *)rx_buffer;
 
 				if (rx_frame_pointer->twr_function_code != 0x23) { /* final */
-					stdio_write("RX ERR: wrong frame (expected final)\n");
+					printf("RX ERR: wrong frame (expected final)\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
-					stdio_write("RX ERR: wrong sequence number\n");
+					printf("RX ERR: wrong sequence number\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
-				stdio_write("RX: Final frame\n");
+				printf("RX: Final frame\n");
 
 				dwt_readrxtimestamp(timestamp_buffer);
 				rx_timestamp_final = decode_40bit_timestamp(timestamp_buffer);
 
 				/* Marker for serial output parsing script*/
 				snprintf(print_buffer, sizeof(print_buffer), "New Frame: poll: %u\n", next_sequence_number);
-				stdio_write(print_buffer);
+				printf(print_buffer);
 
 				/* Transmit measurement data */
-				transmit_rx_diagnostics();
+				transmit_rx_diagnostics(current_rotation);
 				//transmit_cir();
 
 				/* Accept frame continue with ranging */
@@ -358,16 +358,17 @@ int application_twr_pdoa_tag(void)
 
 				/* Transmit TWR round and reply times and ranging estimate */
 				static_assert(sizeof(meas_twr_t) == 40);
-				stdio_write("BLOB / twr / v2 / 40\n");
+				printf("BLOB / twr / v2 / 40\n");
 				meas_twr_t raning_blob = { Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation };
-				stdio_write_binary((uint8_t*)&raning_blob, 40);
-				stdio_write("\n");
+				//stdio_write_binary((uint8_t*)&raning_blob, 40);
+				//stdio_write("\n");
+				csv_write_twr(Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
 
 				/* Transmit human readable for debugging */
-				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_mm: %lu\n", twr_count, dist_mm);
-				stdio_write(print_buffer);
+				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_mm: %.2f\n", twr_count, ((float)dist_mm)/1000);
+				printf(print_buffer);
 				snprintf(print_buffer, sizeof(print_buffer), "rotation: %u, 360_count: %u\n", current_rotation, full_rotation_count);
-				stdio_write(print_buffer);
+				printf(print_buffer);
 
 				/* Rotate receiver */
 				twr_count++;
@@ -408,7 +409,7 @@ int application_twr_pdoa_tag(void)
 			break;
 		case TWR_ERROR:
 			dwt_forcetrxoff();  // make sure receiver is off after an error
-			stdio_write("Ranging error -> reset\n");
+			printf("Ranging error -> reset\n");
 			state = TWR_SYNC_STATE;
 			Sleep(200);
 		}
@@ -464,7 +465,7 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data)
 	dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-void transmit_rx_diagnostics() {
+void transmit_rx_diagnostics(uint16_t current_rotation) {
 	dwt_rxdiag_t rx_diag = {0};
 	dwt_readdiagnostics(&rx_diag);
 	/*
@@ -528,22 +529,32 @@ void transmit_rx_diagnostics() {
 	// Readable pdoa stuff
 	float pdoa_read = ((float)rx_diag.pdoa / (1 << 11));
 
-	snprintf(print_buffer, sizeof(print_buffer), "raw pdoa: %.6f, ",  pdoa_read);
-	stdio_write(print_buffer);
 	// angle
 	float eq_lamb = 4.6196;
 	float eq_d = 2.31;
 	float eq_aoa = asinf((pdoa_read*eq_lamb)/(2*M_PI*eq_d)) * (180/M_PI);
-	snprintf(print_buffer, sizeof(print_buffer), "aoa: %.6f \n",  eq_aoa);
-	stdio_write(print_buffer); 
+
+	// Readabe tdoa stuff
+	int64_t tdoa_read = ((uint64_t)rx_diag.tdoa[0]) \
+						+ ((uint64_t)rx_diag.tdoa[1] << 8) \
+						+ ((uint64_t)rx_diag.tdoa[2] << 16) \
+						+ ((uint64_t)rx_diag.tdoa[3] << 24) \
+						+ ((uint64_t)rx_diag.tdoa[4] << 32);
+	if (rx_diag.tdoa[5] & 0x01){
+		tdoa_read = -tdoa_read;
+	}
+
+	snprintf(print_buffer, sizeof(print_buffer), "raw pdoa: %.6f, tdoa: %ld, aoa: %.6f \n",  pdoa_read, tdoa_read, eq_aoa);
+	printf(print_buffer);
+
+	csv_write_rx(pdoa_read, tdoa_read, current_rotation);
 }
 
 void transmit_cir() {
-	uint8_t cir_buffer[12288];
-	dwt_readaccdata(cir_buffer, 12288+1, 0);
-	stdio_write("BLOB / cir / v1 / 12288\n");
-	stdio_write_binary(cir_buffer, 12288);
-	stdio_write("\n");
+	uint8_t cir_buffer[9216+1]; // reduced from 12288+1
+	dwt_readaccdata(cir_buffer, 9216+1, 0);
+	printf("BLOB / cir / v1 / 9216\n");
+	csv_write_CIR(cir_buffer, 9216+1, 1);
 }
 
 #endif

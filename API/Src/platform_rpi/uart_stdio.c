@@ -34,7 +34,7 @@ FILE  *logfile;
  * @param[in] huart Pointer to the STM32 HAL UART peripheral instance
  */
 void stdio_init() {
-    logfile = fopen("log.txt", "w");
+    logfile = fopen("log.csv", "w");
     assert(logfile != NULL);
 }
 
@@ -87,4 +87,40 @@ inline int stdio_write_binary(const uint8_t *data, uint16_t length)
     }
     return -1;
     */
+}
+
+inline int stdio_write_hex(const uint8_t *data, uint16_t length, uint16_t offset)
+{
+    for (int i=offset; i<length; i++){
+        //print as hexadecimal
+        fprintf(logfile, "%02X", data[i]);
+    }
+    fputc('\n', logfile);
+    fflush(logfile);
+    return length;
+}
+
+inline void csv_write_rx(float pdoa, int64_t tdoa, uint16_t current_rotation){
+    // type 0: rx data for pdoa/tdoa:
+    fprintf(logfile, "0,%f,%ld,%d", pdoa, tdoa, current_rotation);
+    fputc('\n', logfile);
+    fflush(logfile);
+}
+
+inline void csv_write_twr(uint64_t Treply1, uint64_t Treply2, uint64_t Tround1, uint64_t Tround2, uint32_t dist_mm, uint16_t twr_count, uint16_t current_rotation){
+    // type 1: twr data
+    fprintf(logfile, "1,%lu,%lu,%lu,%lu,%u,%u,%u", Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
+    fputc('\n', logfile);
+    fflush(logfile);
+}
+
+inline void csv_write_CIR(const uint8_t *data, uint16_t length, uint16_t offset){
+    // type 2: CIR data
+    fprintf(logfile, "2");
+    for (int i=offset; i<length; i++){
+        //print as hexadecimal
+        fprintf(logfile, ",%02X", data[i]);
+    }
+    fputc('\n', logfile);
+    fflush(logfile);
 }

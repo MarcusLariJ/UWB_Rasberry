@@ -50,7 +50,24 @@ static dwt_config_t config = {
 
 
 int16_t   pdoa_val=0;
-uint8_t   pdoa_message_data[40];//Will hold the data to send to the virtual COM
+uint8_t   tdoa_val[6];
+int64_t  tdoa_val64; 
+uint8_t   pdoa_message_data[80];//Will hold the data to send to the virtual COM
+
+int64_t convert_tdoa(uint8_t* array)
+{
+    int64_t tdoa_out=0;
+
+    for (int i=0; i<5; i++)
+    {
+        tdoa_out += array[i] << i*8;
+    }
+    if (array[5]) 
+    {
+        return tdoa_out;
+    }
+    return tdoa_out;
+}
 
 /**
  * Application entry point.
@@ -109,7 +126,8 @@ int simple_rx_pdoa(void)
         if (last_pdoa_val!=pdoa_val)
         {
             last_pdoa_val=pdoa_val;
-            sprintf((char *)&pdoa_message_data,"PDOA val = %d",last_pdoa_val);
+            tdoa_val64 = convert_tdoa(tdoa_val);
+            sprintf((char *)&pdoa_message_data,"PDOA val = %d, tdoa sign = %d, tdoa val: = %d",last_pdoa_val, tdoa_val[5], tdoa_val64);
             test_run_info((unsigned char *)&pdoa_message_data);
         }
         Sleep(5); // fixes stuck loop
@@ -139,6 +157,7 @@ static void rx_ok_cb(const dwt_cb_data_t *cb_data)
     if(dwt_readstsquality(&cpqual) >= 0) // set to larger than zero instead of equal to 1
     {
         pdoa_val=dwt_readpdoa();
+        dwt_readtdoa(tdoa_val);
     }
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }

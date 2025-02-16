@@ -80,7 +80,7 @@ enum state_t state = TWR_SYNC_STATE;
 int application_twr_anchor(void)
 {
     stdio_init();
-	stdio_write("DW3000 TEST TWR Anchor\n");
+	printf("DW3000 TEST TWR Anchor\n");
 
     /* Configure SPI rate, DW IC supports up to 38 MHz */
     port_set_dw_ic_spi_fastrate();
@@ -95,11 +95,11 @@ int application_twr_anchor(void)
 
     if (dwt_initialise(DWT_DW_INIT) == DWT_ERROR)
     {
-    	stdio_write("INIT FAILED\n");
+    	printf("INIT FAILED\n");
         while (1) { };
     }
 
-    stdio_write("INITIALIZED\n");
+    printf("INITIALIZED\n");
 
     /* Enabling LEDs here for debug so that for each RX-enable the D2 LED will flash on DW3000 red eval-shield boards. */
     dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);
@@ -107,12 +107,12 @@ int application_twr_anchor(void)
     /* Configure DW IC. */
     if(dwt_configure(&config)) /* if the dwt_configure returns DWT_ERROR either the PLL or RX calibration has failed the host should reset the device */
     {
-    	stdio_write("CONFIG FAILED\n");
+    	printf("CONFIG FAILED\n");
         while (1)
         { };
     }
 
-    stdio_write("CONFIGURED\n");
+    printf("CONFIGURED\n");
 
     /* Register RX call-back. */
     dwt_setcallbacks(tx_done_cb, rx_ok_cb, rx_err_cb, rx_err_cb, NULL, NULL);
@@ -134,7 +134,7 @@ int application_twr_anchor(void)
     /* Activate reception immediately. */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-    stdio_write("Waiting for frames\n");
+    printf("Waiting for frames\n");
 
     uint8_t timestamp_buffer[5];
     uint8_t rx_buffer[max_frame_length];
@@ -151,14 +151,14 @@ int application_twr_anchor(void)
 				new_frame = 0;
 
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
-					stdio_write("RX ERR: wrong frame length\n");
+					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
-					stdio_write("RX ERR: bad STS quality\n");
+					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR;
 					continue;
 				}
@@ -168,12 +168,12 @@ int application_twr_anchor(void)
 				rx_frame_pointer = (twr_base_frame_t *)rx_buffer;
 
 				if (rx_frame_pointer->twr_function_code != 0x20) {  /* ranging init */
-					stdio_write("RX ERR: wrong frame (expected sync)\n");
+					printf("RX ERR: wrong frame (expected sync)\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
-				stdio_write("RX: Sync frame\n");
+				printf("RX: Sync frame\n");
 
 				/* Initialize the sequence number for this ranging exchange */
 				next_sequence_number = rx_frame_pointer->sequence_number + 1;
@@ -185,7 +185,7 @@ int application_twr_anchor(void)
 				dwt_writetxfctrl(sizeof(poll_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 				int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
-					stdio_write("TX ERR: could not send poll frame\n");
+					printf("TX ERR: could not send poll frame\n");
 					state = TWR_ERROR;
 					continue;
 				}
@@ -194,7 +194,7 @@ int application_twr_anchor(void)
 		case TWR_POLL_RESPONSE_STATE:
 			if (tx_done == 1) {
 				tx_done = 2;
-				stdio_write("TX: Poll frame\n");
+				printf("TX: Poll frame\n");
 				dwt_readtxtimestamp(timestamp_buffer);
 				tx_timestamp_poll = decode_40bit_timestamp(timestamp_buffer);
 			}
@@ -204,14 +204,14 @@ int application_twr_anchor(void)
 				new_frame = 0; /* reset */
 
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
-					stdio_write("RX ERR: wrong frame length\n");
+					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
-					stdio_write("RX ERR: bad STS quality\n");
+					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR;
 					continue;
 				}
@@ -221,18 +221,18 @@ int application_twr_anchor(void)
 				rx_frame_pointer = (twr_base_frame_t *)rx_buffer;
 
 				if (rx_frame_pointer->twr_function_code != 0x10) { /* response */
-					stdio_write("RX ERR: wrong frame (expected response)\n");
+					printf("RX ERR: wrong frame (expected response)\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
-					stdio_write("RX ERR: wrong sequence number\n");
+					printf("RX ERR: wrong sequence number\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
-				stdio_write("RX: Response frame\n");
+				printf("RX: Response frame\n");
 				dwt_readrxtimestamp(timestamp_buffer);
 				rx_timestamp_response = decode_40bit_timestamp(timestamp_buffer);
 
@@ -271,7 +271,7 @@ int application_twr_anchor(void)
 				dwt_setdelayedtrxtime(tx_timestamp_final >> 8);
 				int r = dwt_starttx(DWT_START_RX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
-					stdio_write("TX ERR: delayed send time missed");
+					printf("TX ERR: delayed send time missed");
 					state = TWR_ERROR;
 					continue;
 				}
@@ -280,12 +280,12 @@ int application_twr_anchor(void)
 		case TWR_FINAL_STATE:
 			if (tx_done == 1) {
 				tx_done = 0;
-				stdio_write("TX: Final frame\n");
+				printf("TX: Final frame\n");
 				state = TWR_SYNC_STATE;
 			}
 			break;
 		case TWR_ERROR:
-			stdio_write("Ranging error -> reset\n");
+			printf("Ranging error -> reset\n");
 			state = TWR_SYNC_STATE;
 			Sleep(500);
 			dwt_rxenable(DWT_START_RX_IMMEDIATE);
