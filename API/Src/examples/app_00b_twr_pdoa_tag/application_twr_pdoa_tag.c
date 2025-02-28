@@ -76,6 +76,10 @@ uint64_t rx_timestamp_final = 0;
 
 uint8_t next_sequence_number = 0;
 
+// unique chip ID of the decawace chip. Used for identification
+const uint16_t CHIPID_ADDR = 0x06;
+uint32_t device_id;
+
 enum state_t {
 	TWR_SYNC_STATE,
 	TWR_POLL_RESPONSE_STATE,
@@ -161,7 +165,11 @@ int application_twr_pdoa_tag(void)
     uint16_t twr_count = 0;
     uint8_t full_rotation_count = 0;
 
-    printf("Wait 3s before starting...");
+    /*Get unique chip ID from OTP memory as device identification*/
+	dwt_otpread(CHIPID_ADDR, &device_id, 1);
+	printf("Chip ID: %u\n", device_id);
+
+	printf("Wait 3s before starting...");
     Sleep(3000);
 
 #ifdef ROTATE
