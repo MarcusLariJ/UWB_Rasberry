@@ -514,3 +514,36 @@ void rotate_reciever(int degrees) {
 	}
 	*/
 }
+
+uint16_t read_encoder(uint16_t cmd){
+    // Send command to encoder and get answer back
+    // 16 bits -> 2 bytes
+    uint8_t chk;
+    uint8_t buffer[2];
+    // commands are read with MSB first - thus switch the two bytes around
+    buffer[0] = (uint8_t)(cmd >> 8);
+    buffer[1] = (uint8_t)cmd;
+    chk = wiringPiSPIDataRW(1, buffer, 2);
+    // The contents of the buffer is now replaced with the response
+    uint16_t contents = (uint16_t)buffer[1] + ((uint16_t)buffer[0] << 8);
+    return contents;
+}
+
+float getAngle(){
+    // simple reads the angle from the encoder and returns it as a float
+    uint16_t cmd_NOP = 0;
+    uint16_t cmd_getAngle = (0x3fff | 0x4000) | 0x8000; // 1 parity (for even), 1 for read, read angle at addresss 0x3fff
+
+    read_encoder(cmd_getAngle);
+    delay(20);
+    uint16_t output = read_encoder(cmd_NOP); // extra NOP to get current value. Maybe increase buffer instead
+    uint8_t alarmbits = (uint8_t)((output >> 14) & 3);
+    if (alarmbits & 1) 
+    {
+        printf("alarm bits on\n");
+        printf("%d\n", alarmbits);
+    }
+    // Convert to angle:
+    return((float)(output & 0x3fff) * (360.0 / 0x4000));
+}
+

@@ -34,7 +34,7 @@ volatile uint8_t rx_done = 0;  /* Flag to indicate a new frame was received from
 volatile uint16_t new_frame_length = 0;
 volatile uint8_t tx_done = 0;
 
-char print_buffer[64];
+char print_buffer[128];
 
 twr_base_frame_t sync_frame = {
 		{ 0x41, 0x88 },	/* Frame Control: data frame, short addresses */
@@ -92,7 +92,7 @@ enum state_t state = TWR_SYNC_STATE;
 /* timeout before the ranging exchange will be abandoned and restarted */
 const static int ranging_timeout = 1000;
 
-void transmit_rx_diagnostics(uint16_t current_rotation);
+void transmit_rx_diagnostics(float current_rotation);
 void transmit_cir();
 
 /**
@@ -160,7 +160,7 @@ int application_twr_pdoa_tag(void)
     int16_t sts_quality_index;
     uint32_t last_sync_time = millis(); // replaced HAL_GetTick();
 
-    uint16_t current_rotation = 0;
+    float current_rotation = 0;
     int8_t rotation_direction = 1;
     uint16_t twr_count = 0;
     uint8_t full_rotation_count = 0;
@@ -260,6 +260,7 @@ int application_twr_pdoa_tag(void)
 				printf(print_buffer);
 
 				/* Transmit measurement data */
+				current_rotation = getAngle();
 				transmit_rx_diagnostics(current_rotation);
 				//transmit_cir();
 
@@ -339,6 +340,7 @@ int application_twr_pdoa_tag(void)
 				printf(print_buffer);
 
 				/* Transmit measurement data */
+				current_rotation = getAngle();
 				transmit_rx_diagnostics(current_rotation);
 				//transmit_cir();
 
@@ -473,7 +475,7 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data)
 	dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-void transmit_rx_diagnostics(uint16_t current_rotation) {
+void transmit_rx_diagnostics(float current_rotation) {
 	dwt_rxdiag_t rx_diag = {0};
 	dwt_readdiagnostics(&rx_diag);
 	/*
@@ -549,10 +551,11 @@ void transmit_rx_diagnostics(uint16_t current_rotation) {
 						+ ((uint64_t)rx_diag.tdoa[3] << 24) \
 						+ ((uint64_t)rx_diag.tdoa[4] << 32);
 	if (rx_diag.tdoa[5] & 0x01){
-		tdoa_read = -tdoa_read;
+		// negative signed number. Set all upper 24 bits to 1:
+		tdoa_read = tdoa_read | 0xffffff0000000000;
 	}
 
-	snprintf(print_buffer, sizeof(print_buffer), "raw pdoa: %.6f, tdoa: %ld, aoa: %.6f \n",  pdoa_read, tdoa_read, eq_aoa);
+	snprintf(print_buffer, sizeof(print_buffer), "raw pdoa: %.6f, tdoa: %ld, aoa: %.6f, True angle: %.1f \n",  pdoa_read, tdoa_read, eq_aoa, current_rotation);
 	printf(print_buffer);
 
 	csv_write_rx(pdoa_read, tdoa_read, current_rotation);

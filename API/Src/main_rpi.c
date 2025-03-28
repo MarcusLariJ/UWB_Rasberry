@@ -137,7 +137,12 @@ static void RPi_SPI1_Init(void)
 {
     int fd = wiringPiSPISetupMode(SPI_CHANNEL, SPI_CLOCK_SPEED_FAST, 0);
     if (fd == -1) {
-        fprintf(stderr, "Failed to init SPI communication: %s\n", strerror(errno));
+        fprintf(stderr, "Failed to init SPI communication, CS0: %s\n", strerror(errno));
     }
-    printf("SPI communication successfully setup.\n");
+    // Channel for the encoder
+    fd = wiringPiSPISetupMode(1, 2000000, 1);
+    if (fd == -1) {
+        fprintf(stderr, "Failed to init SPI communication, CS1: %s\n", strerror(errno));
+    }
+    printf("SPI communication for both channels successfully setup.\n");
 }

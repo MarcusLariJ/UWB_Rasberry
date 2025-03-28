@@ -109,6 +109,11 @@ uint64_t decode_40bit_timestamp(const uint8_t buffer[5]);
 /* Rotate the stepper motor */
 void rotate_reciever(int degrees);
 
+/* Read encoder */
+uint16_t read_encoder(uint16_t cmd);
+
+/*Get angle */
+float getAngle();
 
 #ifdef __cplusplus
 }

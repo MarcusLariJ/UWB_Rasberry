@@ -100,9 +100,9 @@ inline int stdio_write_hex(const uint8_t *data, uint16_t length, uint16_t offset
     return length;
 }
 
-inline void csv_write_rx(float pdoa, int64_t tdoa, uint16_t current_rotation){
+inline void csv_write_rx(float pdoa, int64_t tdoa, float current_rotation){
     // type 0: rx data for pdoa/tdoa:
-    fprintf(logfile, "0,%f,%ld,%d", pdoa, tdoa, current_rotation);
+    fprintf(logfile, "0,%f,%ld,%f", pdoa, tdoa, current_rotation);
     fputc('\n', logfile);
     fflush(logfile);
 }

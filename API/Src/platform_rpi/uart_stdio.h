@@ -45,7 +45,7 @@ int stdio_write_binary(const uint8_t *data, uint16_t length);
 
 int stdio_write_hex(const uint8_t *data, uint16_t length, uint16_t offset);
 
-void csv_write_rx(float pdoa, int64_t tdoa, uint16_t current_rotation);
+void csv_write_rx(float pdoa, int64_t tdoa, float current_rotation);
 
 void csv_write_twr(uint64_t Treply1, uint64_t Treply2, uint64_t Tround1, uint64_t Tround2, uint32_t dist_mm, uint16_t twr_count, uint16_t current_rotation);
 
