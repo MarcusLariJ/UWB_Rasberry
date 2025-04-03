@@ -188,7 +188,7 @@ class MotionModel(ABC):
 
 def JacobianFD(f: callable, f_eval: np.ndarray, x: np.ndarray, u: np.ndarray,
                rad_sel: np.ndarray, *args: List) -> Tuple[np.ndarray]:
-    """ Determines the Jacobians given a function [f] with respect to both [x] and [u]. Examples:
+    """ Determines the Jacobians given a function [f] with respect to both [x] and [u]. EX_Amples:
     
             x_dot = f(x, u)
             
@@ -327,7 +327,7 @@ class GaussianParam:
 class GaussianDensity:
     
     @staticmethod
-    def expected_value(state: GaussianParam) -> np.array:
+    def eX_Pected_value(state: GaussianParam) -> np.array:
         return state.x
     
     @staticmethod
