@@ -6,8 +6,8 @@ import numpy as np
 def setup_plot() -> tuple[plt.Figure, plt.Axes]:
     fig, ax = plt.subplots(figsize=(7, 7))
     ax.set_title("Robot trajectory")
-    ax.set_xlabel("x [no unit]")
-    ax.set_ylabel("y [no unit]")
+    ax.set_xlabel("x [m]")
+    ax.set_ylabel("y [m]")
     ax.set_xlim((-15,15))
     ax.set_ylim((-15,15))
     ax.grid()
@@ -78,7 +78,7 @@ def plot_measurement(ax: plt.Axes, xi: np.ndarray, xj: np.ndarray):
         xi (np.ndarray): The state of robot i recieving the measurement
         xj (np.ndarray): The state of the robot j sending the measurement
     """
-    p1 = xi[X_P]
-    p2 = xj[X_P]
+    p1 = xi[X_P,0]
+    p2 = xj[X_P,0]
     d = p2 - p1
     ax.arrow(p1[0], p1[1], d[0], d[1])

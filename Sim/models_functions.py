@@ -42,20 +42,20 @@ def wrappingPi(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Difference of vector
     """
-    n, nx, _ = x.shape
+    n, nx = x.shape
     if x.size:
         return ((x - y + np.pi) % (2*np.pi)) - np.pi
     else:
-        return np.zeros(shape=(n, nx, 1), dtype=x.dtype)
+        return np.zeros(shape=(n, nx), dtype=x.dtype)
 
 def subtractState(s0x: np.ndarray, s1x: np.ndarray, rad_sel: np.ndarray) -> np.ndarray:
     # Handle states with radians as units
-    n, nx, _ = s0x.shape
-    x_diff = np.zeros((n, nx, 1))
+    n, nx = s0x.shape
+    x_diff = np.zeros((n, nx))
     # Radian subtraction
-    x_diff[:,rad_sel] = wrappingPi(s0x[:,rad_sel], s1x[:,rad_sel])
+    x_diff[rad_sel] = wrappingPi(s0x[rad_sel], s1x[rad_sel])
     # Other states; normal subtraction
-    x_diff[:,~rad_sel] = s0x[:,~rad_sel] - s1x[:,~rad_sel]
+    x_diff[~rad_sel] = s0x[~rad_sel] - s1x[~rad_sel]
     return x_diff
 
 
@@ -65,7 +65,7 @@ def subtractState(s0x: np.ndarray, s1x: np.ndarray, rad_sel: np.ndarray) -> np.n
 class MeasModel:
     """ Base measurement model class
     """
-    def __init__(self, t = np.array([[0],[0]]), R = np.diag([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])):
+    def __init__(self, t = np.array([[0],[0]]), R = np.diag([0.1]*MEAS_LEN)):
         """"
         Inits the measurement model
         Args:
@@ -75,7 +75,9 @@ class MeasModel:
         
         self._t = t
         self._R = R 
-        self._radian_sel = np.array([Z_PHI])
+        sel = np.array([False]*MEAS_LEN)
+        sel[Z_PHI] = True 
+        self._radian_sel = sel
         self._H = np.zeros((MEAS_LEN, STATE_LEN))
         self._z = np.zeros((MEAS_LEN, 1))
 
@@ -84,6 +86,12 @@ class MeasModel:
         """ Get measurement covariance matrix
         """
         return self._R
+    
+    @R.setter
+    def R(self, var: np.ndarray):
+        """ Set measurement matrix
+        """
+        self._R = var
     
     @property
     def t(self) -> np.ndarray:
@@ -108,7 +116,7 @@ class MeasModel:
             (np.ndarray): The measurement of state xi, xj 
         """
         self._z[Z_W] = xi[X_W] - xi[X_BW]
-        self._z[Z_A] = RM(xi[X_THETA][0]) @ (xi[X_A] - xi[X_BA])
+        self._z[Z_A] = RM(-xi[X_THETA][0]) @ (xi[X_A] - xi[X_BA])
         
         # ONly return the part that corresponds to IMU measurement
         return self._z[Z_W:]
@@ -146,11 +154,12 @@ class MeasModel:
         Returns:
             (np.ndarray): The Jacobian matrix evaluated at x0
         """
+        thetai = x0[X_THETA][0]
         self._H[Z_W, X_W] = 1; self._H[Z_W, X_BW] = -1
-        self._H[Z_A, X_THETA] = RMdot(x0[X_THETA]) @ (x0[X_A] - x0[X_BA]); self._H[Z_A, X_A] = RM(x0[X_THETA]); self._H[Z_A, X_BA] = -RM(x0[X_THETA]) 
+        self._H[Z_A, X_THETA:X_THETA+1] = RMdot(-thetai) @ (x0[X_A] - x0[X_BA]); self._H[Z_A, X_A] = RM(-thetai); self._H[Z_A, X_BA] = -RM(-thetai) 
 
         # Return only partial H, corresponding to IMU measurements:
-        return self._H[Z_W,:]
+        return self._H[Z_W:,:]
 
     def get_jacobian_full(self, xi0: np.ndarray, xj0: np.ndarray, tj: np.ndarray) -> np.ndarray:
         """
@@ -165,14 +174,16 @@ class MeasModel:
             (np.ndarray): The Jacobian matrix evaluated at xi0, xj0
         """
         ti = self._t
+        thetai = xi0[X_THETA][0]
+        thetaj = xj0[X_THETA][0]
         # Precompute q
-        q = (xj0[X_P] + RM(xj0[X_THETA]) @ tj - xi0[X_P] - RM(xi0[X_THETA]) @ ti)
+        q = (xj0[X_P] + RM(thetaj) @ tj - xi0[X_P] - RM(thetai) @ ti)
         # Compute the Jacobian for IMU measurement:
         self.get_jacobian_IMU(xi0)
         # Compute the Jacobian for range/angle measurement:
-        self._H[Z_PHI, X_THETA] = (RMdot(xj0[X_THETA])[0,:] @ ti * q[1] - RMdot(xj0[X_THETA])[1,:] @ ti * q[0])/(np.transpose(q) @ q) + 1
-        self._H[Z_PHI, X_P] = np.array([q[1], -q[0]]) / (np.transpose(q) @ q)
-        self._H[Z_R, X_THETA] = (np.transpose(q) @ (-RMdot(xi0[X_THETA])) @ ti + np.transpose(-RMdot(xi0[X_THETA]) @ ti) @ q) / (2*np.sqrt(np.transpose(q) @ q))
+        self._H[Z_PHI, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) + 1
+        self._H[Z_PHI, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
+        self._H[Z_R, X_THETA] = (np.transpose(q) @ (-RMdot(thetai)) @ ti + np.transpose(-RMdot(thetai) @ ti) @ q) / (2*np.sqrt(np.transpose(q) @ q))
         self._H[Z_R, X_P] = - np.transpose(q) / np.sqrt(np.transpose(q) @ q)
 
         return self._H
@@ -201,10 +212,10 @@ class MotionModel:
         A[X_V, X_A] = dt*np.eye(2) 
         self._A = A
 
-        B[X_W, U_ETAW] = 1
-        B[X_A, U_ETAA] = np.eye(2)
-        B[X_BW, U_ETABW] = 1
-        B[X_BA, U_ETABA] = np.eye(2)
+        B[X_W, U_ETAW] = dt
+        B[X_A, U_ETAA] = np.eye(2)*dt
+        B[X_BW, U_ETABW] = dt
+        B[X_BA, U_ETABA] = np.eye(2)*dt
         self._B = B
 
         self._x = x0
@@ -219,6 +230,12 @@ class MotionModel:
 
     @x.setter
     def x(self, state: np.ndarray):
+        """
+        Set the state
+        NOTICE: do NOT set individual states using indicies!
+        This will overwrite all states of all motion models.
+        Instead, pass a new numpy array
+        """
         self._x = state
 
     @property
@@ -275,35 +292,85 @@ class MotionModel:
 #### Kalman Filters ####
 
 
-def SimpleKalmanFilter(mot: MotionModel, meas: MeasModel, y: np.ndarray):
+def _KF(x: np.ndarray, 
+       P: np.ndarray, 
+       H: np.ndarray, 
+       R: np.ndarray, 
+       y: np.ndarray,
+       ypred: np.ndarray,
+       radian_sel: np.ndarray):
     """
     Computes the Kalman gain and updates the states and covariance.
-    This filter is for single robot uses or when implementing a 
-    naive collaborative localiZ_Ation system where cross correlations are neglected.
     Args: 
-        mot (MotionModel): The motion model to use
-        meas (MeasModel): The measurement model to use
-        y (np.ndarray): the measurement recived by the sensors 
+        x (np.ndarray): States to update
+        P (np.ndarray): Process noise to update
+        H (np.ndarray): Jacobian of output matrix
+        y (np.ndarray): Measured output
+        radian_sel (np.ndarray): Array indicating which states are given in radians
     """
-    P = mot.P
-    x = mot.x
-    C = meas.get_jacobian(mot.x)
-    R = meas.R
-    Q = C @ P @ np.transpose(C) + R
-    ypred = C @ x
-    r_sel = meas.radian_sel
+    Q = H @ P @ np.transpose(H) + R
+    r_sel = radian_sel
     inno = subtractState(y, ypred, r_sel)
     # Compute gain:
-    K = P @ np.transpose(C) @ np.invert(Q)
+    K = P @ np.transpose(H) @ np.linalg.inv(Q)
     # Update state estimate
     xnew = x + K @ inno 
     # Update covariance
-    Pnew = (np.eye(STATE_LEN) - K @ C) @ P @ np.transpose(np.eye(STATE_LEN) - K @ C) + K @ R @ np.transpose(K)
-    # Apply updates to robots:
+    Pnew = (np.eye(STATE_LEN) - K @ H) @ P
+    # Return new values:
+    return xnew, Pnew, inno, K
+
+def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
+    """
+    Simple KF for when IMU measurements come in
+    Args:
+        mot (MotionModel): Motion model of the robot 
+        meas (MeasModel): Measurement model of the robot
+        y (np.ndarray): Incoming measurement
+    Returns:
+        inno (np.ndarray): Innovation
+    """
+    x = mot.x
+    P = mot.P
+    H = meas.get_jacobian_IMU(x)
+    R = meas.R[Z_W:,Z_W:] # Only use noise related to IMU
+    ypred = meas.h_IMU(x)
+    radian_sel = meas.radian_sel[Z_W:]
+    xnew, Pnew, inno, _ = _KF(x, P, H, R, y, ypred, radian_sel)
     mot.x = xnew
     mot.P = Pnew
-    return xnew, Pnew
 
+    return inno
+
+def KF_full(moti: MotionModel, 
+            motj: MotionModel, 
+            measi: MeasModel,
+            measj: MeasModel, 
+            y: np.ndarray) -> np.ndarray:
+    """
+    KF for both IMU for robot i and range/bearing measurement between robot i and j
+    Args:
+        moti (MotionModel): Motion model of the ego robot i 
+        motj (MotionModel): Motion model of the other robot j
+        measi (MeasModel): Measurement model of the robot i
+        measj (MeasModel): Meadurement model of the robot j
+        y (np.ndarray): Incoming measurement
+    Returns:
+        inno (np.ndarray): Innovation
+    """
+    xi = moti.x
+    xj = motj.x
+    tj = measj.t
+    P = moti.P
+    H = measi.get_jacobian_full(xi, xj, tj)
+    R = measi.R
+    ypred = measi.h_full(xi, xj, tj)
+    radian_sel = measi.radian_sel
+    xnew, Pnew, inno, _ = _KF(xi, P, H, R, y, ypred, radian_sel)
+    moti.x = xnew
+    moti.P = Pnew
+
+    return inno
 
 def centralizedKF(moti: MotionModel, motj: MotionModel, meas: MeasModel, y: np.ndarray):
     """
