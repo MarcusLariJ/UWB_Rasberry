@@ -30,7 +30,12 @@ U_ETABA = slice(4,6)
 
 STATE_LEN = 11
 MEAS_LEN = 5
+IMU_LEN = 3
 INPUT_LEN = 6
+
+
+#### Helper functions ####
+
 
 def wrappingPi(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """ Takes in two arrays of radians and computes the difference when the scale is -pi to pi
@@ -212,6 +217,7 @@ class MotionModel:
         A[X_V, X_A] = dt*np.eye(2) 
         self._A = A
 
+        # TODO: Maybe we don't need to multiply with dt here?
         B[X_W, U_ETAW] = dt
         B[X_A, U_ETAA] = np.eye(2)*dt
         B[X_BW, U_ETABW] = dt
@@ -404,6 +410,41 @@ def luftKF():
     """
     pass
 
+
+#### Fake measurements ####
+
+
+def gen_IMU_meas(pos: np.ndarray,
+                dt,
+                sigma: np.ndarray = np.diag([0]*IMU_LEN), 
+                bias: np.ndarray = np.zeros((IMU_LEN,1))) -> np.ndarray:
+    """
+    From a sequence of poses, this function generates a sequence of IMU measurements
+    Args:
+        pos (np.ndarray): Array of positions. Dimension = 3 X MEAS_NUM
+        sigma (np.ndarray): Noise power. Dimension = IMU_LEN X IMU_LEN
+        bias (np.ndarray): Constant measurement bias to apply. Dimension = IMU_LEN X 1
+        dt: Time difference
+    """
+    # First, find first derivative:
+    v_diff = np.diff(pos, axis=1)*(1/dt)
+    # Then next derivative:
+    a_diff = np.diff(v_diff, axis=1)*(1/dt)
+    a_diff[0,:] = v_diff[0,:-1] # The angle is only of 1st order
+    meas_len, meas_num = a_diff.shape
+    # Convert to body acceleration:
+    for i in range(meas_num):
+        a_diff[1:,i] = RM(pos[0,i]) @ a_diff[1:,i]
+
+    # Random noise: TODO: is this applied correctly?
+    noise = (sigma*dt) @ np.random.rand(IMU_LEN, meas_num)
+    # Bias:
+    bias_m = np.repeat(bias, meas_num, axis=1)
+    # Combine noise and bias:
+    meas = a_diff + noise + bias_m
+
+    return meas
+    
 
 
 
