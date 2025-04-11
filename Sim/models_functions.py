@@ -186,10 +186,10 @@ class MeasModel:
         # Compute the Jacobian for IMU measurement:
         self.get_jacobian_IMU(xi0)
         # Compute the Jacobian for range/angle measurement:
-        self._H[Z_PHI, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) + 1
+        self._H[Z_PHI, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) - 1
         self._H[Z_PHI, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
         self._H[Z_R, X_THETA] = (np.transpose(q) @ (-RMdot(thetai)) @ ti + np.transpose(-RMdot(thetai) @ ti) @ q) / (2*np.sqrt(np.transpose(q) @ q))
-        self._H[Z_R, X_P] = - np.transpose(q) / np.sqrt(np.transpose(q) @ q)
+        self._H[Z_R, X_P] = -np.transpose(q) / np.sqrt(np.transpose(q) @ q)
 
         return self._H
 
@@ -209,19 +209,19 @@ class MotionModel:
 
         self._P = P
         self._Q = Q
+        self._dt = dt
         A = np.eye(STATE_LEN)
         B = np.zeros((STATE_LEN, INPUT_LEN))
 
         A[X_THETA, X_W] = dt
-        A[X_P, X_V] = dt*np.eye(2); A[X_P, X_A] = 0.5*dt**2*np.eye(2)
+        A[X_P, X_V] = dt*np.eye(2); A[X_P, X_A] = 0.5*np.eye(2)*(dt**2)
         A[X_V, X_A] = dt*np.eye(2) 
         self._A = A
 
-        # TODO: Maybe we don't need to multiply with dt here?
-        B[X_W, U_ETAW] = dt
-        B[X_A, U_ETAA] = np.eye(2)*dt
-        B[X_BW, U_ETABW] = dt
-        B[X_BA, U_ETABA] = np.eye(2)*dt
+        B[X_W, U_ETAW] = 1
+        B[X_A, U_ETAA] = np.eye(2)
+        B[X_BW, U_ETABW] = 1
+        B[X_BA, U_ETABA] = np.eye(2)
         self._B = B
 
         self._x = x0
@@ -290,7 +290,8 @@ class MotionModel:
         Returns:
             Updated state covariance
         """
-        Pnew = self._A @ self._P @ np.transpose(self._A) + self._B @ self._Q @ np.transpose(self._B)
+        # TODO: notice dt here
+        Pnew = self._A @ self._P @ np.transpose(self._A) + self._B @ self._Q @ np.transpose(self._B)*self._dt
         self._P = Pnew
         return Pnew
 
@@ -420,21 +421,35 @@ def gen_IMU_meas(pos: np.ndarray,
                 bias: np.ndarray = np.zeros((IMU_LEN,1))) -> np.ndarray:
     """
     From a sequence of poses, this function generates a sequence of IMU measurements
+    TODO: Maybe pad output meas a bit out with zeros
+    TODO: Delete
     Args:
         pos (np.ndarray): Array of positions. Dimension = 3 X MEAS_NUM
         sigma (np.ndarray): Noise power. Dimension = IMU_LEN X IMU_LEN
         bias (np.ndarray): Constant measurement bias to apply. Dimension = IMU_LEN X 1
         dt: Time difference
+    returns:
+        meas (np.ndarray): Generated IMU measurements
+        x0 (np.ndarray): Starting conditions of posistion, velocity and acceleration 
     """
+    x0 = np.zeros((STATE_LEN, 1))
+    x0[X_THETA] = pos[0,0]
+    x0[X_P] = pos[1:,0:1]
+
     # First, find first derivative:
     v_diff = np.diff(pos, axis=1)*(1/dt)
+    x0[X_W] = v_diff[0,0]
+    x0[X_V] = v_diff[1:,0:1]
+
     # Then next derivative:
     a_diff = np.diff(v_diff, axis=1)*(1/dt)
+    x0[X_A] = a_diff[1:,0:1]
     a_diff[0,:] = v_diff[0,:-1] # The angle is only of 1st order
     meas_len, meas_num = a_diff.shape
+    
     # Convert to body acceleration:
     for i in range(meas_num):
-        a_diff[1:,i] = RM(pos[0,i]) @ a_diff[1:,i]
+        a_diff[1:,i] = RM(-pos[0,i]) @ a_diff[1:,i]
 
     # Random noise: TODO: is this applied correctly?
     noise = (sigma*dt) @ np.random.rand(IMU_LEN, meas_num)
@@ -443,7 +458,7 @@ def gen_IMU_meas(pos: np.ndarray,
     # Combine noise and bias:
     meas = a_diff + noise + bias_m
 
-    return meas
+    return meas, x0
     
 
 
