@@ -110,6 +110,48 @@ class MeasModel:
         """
         return self._radian_sel
 
+    def h_bearing(self, xi: np.ndarray, xj: np.ndarray, tj: np.ndarray) -> np.ndarray:
+        """
+        Computes the bearing prediction only
+
+        Args:
+            xi (np.ndarray): The information of the state of the ego robot at time 'k'
+            xj (np.ndarray): The information of the state at the measured robot j at time 'k'
+            
+        Returns:
+            float: the bearing of state xi, xj 
+        """
+        # Precompute q
+        thetaj = xj[X_THETA][0]
+        thetai = xi[X_THETA][0]
+        q = (xj[X_P] + RM(thetaj) @ tj - xi[X_P] - RM(thetai) @ self._t)
+        
+        phi = np.arctan2(q[1], q[0]) - xi[X_THETA]
+        
+        # ONly return the part that corresponds to bearing
+        return phi
+    
+    def h_rb(self, xi: np.ndarray, xj: np.ndarray, tj: np.ndarray) -> np.ndarray:
+        """ 
+        Computes the masurement update when we have access to measurement with other robot
+
+        Args:
+            xi (np.ndarray): The information of the state of the ego robot i at time 'k'
+            xj (np.ndarray): The information of the state at the measured robot j at time 'k'
+            
+        Returns:
+            (np.ndarray): The measurement of state xi, xj 
+        """
+        # Precompute q
+        thetaj = xj[X_THETA][0]
+        thetai = xi[X_THETA][0]
+        q = (xj[X_P] + RM(thetaj) @ tj - xi[X_P] - RM(thetai) @ self._t)
+        # Range and bearing:
+        self._z[Z_PHI] = np.arctan2(q[1], q[0]) - xi[X_THETA]
+        self._z[Z_R] = np.sqrt(np.transpose(q) @ q)
+
+        return self._z[:Z_W]
+
     def h_IMU(self, xi: np.ndarray) -> np.ndarray:
         """
         Computes the simple mesurement update, where we only have access to propertiary sensors
@@ -138,16 +180,60 @@ class MeasModel:
             (np.ndarray): The measurement of state xi, xj 
         """
         # Precompute q
-        thetaj = xj[X_THETA][0]
-        thetai = xi[X_THETA][0]
-        q = (xj[X_P] + RM(thetaj) @ tj - xi[X_P] - RM(thetai) @ self._t)
+        #thetaj = xj[X_THETA][0]
+        #thetai = xi[X_THETA][0]
+        #q = (xj[X_P] + RM(thetaj) @ tj - xi[X_P] - RM(thetai) @ self._t)
         # Range and bearing:
-        self._z[Z_PHI] = np.arctan2(q[1], q[0]) - xi[X_THETA]
-        self._z[Z_R] = np.sqrt(np.transpose(q) @ q)
+        #self._z[Z_PHI] = np.arctan2(q[1], q[0]) - xi[X_THETA]
+        #self._z[Z_R] = np.sqrt(np.transpose(q) @ q)
+        
+        # RB measurement:
+        self.h_rb(xi, xj, tj)
         # The IMU measurement:
         self.h_IMU(xi)
 
         return self._z
+
+    def get_jacobian_bearing(self, xi0: np.ndarray, xj0: np.ndarray, tj: np.ndarray) -> np.ndarray:
+        
+        H = np.zeros((1, STATE_LEN))
+
+        ti = self._t
+        thetai = xi0[X_THETA][0]
+        thetaj = xj0[X_THETA][0]
+        # Precompute q
+        q = (xj0[X_P] + RM(thetaj) @ tj - xi0[X_P] - RM(thetai) @ ti)
+
+        H[0, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) - 1
+        H[0, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
+        
+        return H
+
+
+    def get_jacobian_rb(self, xi0: np.ndarray, xj0: np.ndarray, tj: np.ndarray) -> np.ndarray:
+        """
+        Computes the jacobian at time k for the measurement
+
+        Args:
+            xi0 (np.ndarray): The stationary point for the ego bot
+            xj0 (np.ndarray): The stationary point for the measurement bot
+            tj: (np.ndarray): The offset of the measurement bot
+
+        Returns:
+            (np.ndarray): The Jacobian matrix evaluated at xi0, xj0
+        """
+        ti = self._t
+        thetai = xi0[X_THETA][0]
+        thetaj = xj0[X_THETA][0]
+        # Precompute q
+        q = (xj0[X_P] + RM(thetaj) @ tj - xi0[X_P] - RM(thetai) @ ti)
+        # Compute the Jacobian for range/angle measurement:
+        self._H[Z_PHI, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) - 1
+        self._H[Z_PHI, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
+        self._H[Z_R, X_THETA] = (np.transpose(q) @ (-RMdot(thetai)) @ ti + np.transpose(-RMdot(thetai) @ ti) @ q) / (2*np.sqrt(np.transpose(q) @ q))
+        self._H[Z_R, X_P] = -np.transpose(q) / np.sqrt(np.transpose(q) @ q)
+
+        return self._H[:Z_W,:]
 
     def get_jacobian_IMU(self, x0: np.ndarray) -> np.ndarray:
         """
@@ -186,10 +272,12 @@ class MeasModel:
         # Compute the Jacobian for IMU measurement:
         self.get_jacobian_IMU(xi0)
         # Compute the Jacobian for range/angle measurement:
-        self._H[Z_PHI, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) - 1
-        self._H[Z_PHI, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
-        self._H[Z_R, X_THETA] = (np.transpose(q) @ (-RMdot(thetai)) @ ti + np.transpose(-RMdot(thetai) @ ti) @ q) / (2*np.sqrt(np.transpose(q) @ q))
-        self._H[Z_R, X_P] = -np.transpose(q) / np.sqrt(np.transpose(q) @ q)
+        self.get_jacobian_rb(xi0, xj0, tj)
+
+        #self._H[Z_PHI, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) - 1
+        #self._H[Z_PHI, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
+        #self._H[Z_R, X_THETA] = (np.transpose(q) @ (-RMdot(thetai)) @ ti + np.transpose(-RMdot(thetai) @ ti) @ q) / (2*np.sqrt(np.transpose(q) @ q))
+        #self._H[Z_R, X_P] = -np.transpose(q) / np.sqrt(np.transpose(q) @ q)
 
         return self._H
 
@@ -462,9 +550,110 @@ def gen_IMU_meas(pos: np.ndarray,
     
 
 
+#### ML estimators ####
 
+def _pdf_meas_1D(P: np.ndarray, 
+        H: np.ndarray, 
+        r: float, 
+        z: float,
+        zpred: float,
+        radian_sel: int):
+    """
+    Calculate the probability for the measurement, to be used in ML.
+    This function is only for use for single-variable distributions
+    Args:
+        P (np.ndarray): Process noise
+        H (np.ndarray): Jacobian of output matrix (only for bearing!!)
+        r (float): Measured output noise
+        y (np.ndarray): Measured output
+        radian_sel (int): 0 for normal substraction, 1 for radian substraction
+    Returns:
+        prob (float): Probability of measurement
+    """
+    
+    # Special substraction for radians:
+    if radian_sel == 1:
+        diff = ((z - zpred + np.pi) % (2*np.pi)) - np.pi #TODO maybe reuse wrappingpi here
+    else:
+        diff = z - zpred
+    prob = (1/np.sqrt(2*np.pi*r))*np.exp(-(diff**2)/(2*r))
+    
+    return prob
 
+def _pdf_meas(S: np.ndarray,
+        inno: np.ndarray):
+    """
+    Calculate the probability for the measurement, to be used in ML.
+    This function is for multi-variable distributions
+    Args:
+        S (np.ndarray): 
+        inno (np.ndarray): Difference between y and ypred
+    Returns:
+        prob (float): Probability of measurement
+    """
+    prob = (1/np.sqrt(np.linalg.det(2*np.pi*S))) * np.exp(-(1/2)*np.transpose(inno) @ np.linalg.inv(S) @ inno)
+    
+    return prob
 
+def ML_bearing(b, 
+               r, 
+               moti: MotionModel, 
+               motj: MotionModel,
+               measi: MeasModel,
+               measj: MeasModel):
+    """
+    Uses ML to find the most likely bearing, based on the prediction 
+    from the motion model 
+    """
+    P = moti.P
+    H = measi.get_jacobian_bearing()
+    r_phi = measi.R[Z_PHI, Z_PHI] #TODO: right now, use the same noise for all possible measurements
+    zpred_phi = measi.h_bearing(moti.x, motj.x, measj.t)
 
+    z = np.zeros((2,1))
+    z_n = b.shape[0]
+    ml = 0
+    for bi in b:
+        p = _pdf_meas_1D(P, H, r_phi, bi, zpred_phi, 1)
+        if p > ml:
+            ml = p
+    z[0] = ml
+    z[1] = r
 
+    return z
 
+def ML_rb(b, 
+               r, 
+               moti: MotionModel, 
+               motj: MotionModel,
+               measi: MeasModel,
+               measj: MeasModel):
+    """
+    Uses ML to find the most likely range/bearing, based on the prediction 
+    from the motion model 
+    """
+    P = moti.P
+    H = measi.get_jacobian_rb(moti.x, motj.x, measj.t)
+    zpred = measi.h_rb(moti.x, motj.x, measj.t)
+    rad_sel = measi.radian_sel[:Z_W]
+
+    R = measi.R[:Z_W, :Z_W] #TODO: right now, use the same noise for all possible measurements
+    S = H @ P @ np.transpose(H) + R
+
+    z = np.zeros((2,1))
+    z[1] = r
+    b_final = 0
+    ml = 0
+    for bi in b:
+        z[0] = bi
+        inno = subtractState(z, zpred, rad_sel)
+        # Calculate likelihood
+        p = _pdf_meas(S, inno)
+        # If larger than previous maximum, then update the bearing to be used
+        if p > ml:
+            ml = p
+            b_final = bi
+    # Use the most likely bearing for final measurement
+    z[0] = b_final
+
+    return z
