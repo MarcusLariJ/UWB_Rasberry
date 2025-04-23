@@ -7,6 +7,12 @@ import numpy as np
 RM = lambda theta: np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
 RMdot = lambda theta: np.array([[-np.sin(theta),-np.cos(theta)],[np.cos(theta),-np.sin(theta)]])
 
+STATE_LEN = 11
+MEAS_LEN = 5
+IMU_LEN = 3
+RB_LEN = 2
+INPUT_LEN = 6
+
 # Enums for state space:
 X_THETA = 0
 X_W = 1
@@ -15,6 +21,8 @@ X_V = slice(4,6)
 X_A = slice(6,8)
 X_BW = 8
 X_BA = slice(9,11)
+X_THETA_EXT = X_THETA+STATE_LEN
+X_P_EXT = slice(2+STATE_LEN, 4+STATE_LEN)
 
 # Enums for measurement space:
 Z_PHI = 0
@@ -28,14 +36,7 @@ U_ETAA = slice(1,3)
 U_ETABW = 3
 U_ETABA = slice(4,6)
 
-STATE_LEN = 11
-MEAS_LEN = 5
-IMU_LEN = 3
-INPUT_LEN = 6
-
-
 #### Helper functions ####
-
 
 def wrappingPi(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """ Takes in two arrays of radians and computes the difference when the scale is -pi to pi
@@ -234,6 +235,34 @@ class MeasModel:
         self._H[Z_R, X_P] = -np.transpose(q) / np.sqrt(np.transpose(q) @ q)
 
         return self._H[:Z_W,:]
+
+    def get_jacobian_rb_ext(self, xi0: np.ndarray, xj0: np.ndarray, tj: np.ndarray) -> np.ndarray:
+        """
+        Computes the jacobian at time k for the measurement of both robots
+
+        Args:
+            xi0 (np.ndarray): The stationary point for the ego bot
+            xj0 (np.ndarray): The stationary point for the measurement bot
+            tj: (np.ndarray): The offset of the measurement bot
+
+        Returns:
+            (np.ndarray): The Jacobian matrix evaluated at xi0, xj0
+        """
+        Hij = np.zeros((RB_LEN, STATE_LEN*2))
+        ti = self._t
+        thetai = xi0[X_THETA][0]
+        thetaj = xj0[X_THETA][0]
+        # Precompute q
+        q = (xj0[X_P] + RM(thetaj) @ tj - xi0[X_P] - RM(thetai) @ ti)
+        # Compute the normal jacobian first
+        Hij[:,:STATE_LEN] = self.get_jacobian_rb(xi0=xi0, xj0=xj0, tj=tj)
+        # Then the extended part:
+        Hij[Z_PHI, X_THETA_EXT] = (-RMdot(thetaj)[0,:] @ tj * q[1] + RMdot(thetaj)[1,:] @ tj * q[0])/(np.transpose(q) @ q)
+        Hij[Z_PHI, X_P_EXT] = np.array([-q[1], q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
+        Hij[Z_R, X_THETA_EXT] = (np.transpose(q) @ (RMdot(thetaj)) @ tj + np.transpose(RMdot(thetaj) @ tj) @ q) / (2*np.sqrt(np.transpose(q) @ q))
+        Hij[Z_R, X_P_EXT] = np.transpose(q) / np.sqrt(np.transpose(q) @ q)
+
+        return Hij
 
     def get_jacobian_IMU(self, x0: np.ndarray) -> np.ndarray:
         """
@@ -434,6 +463,72 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
     xnew, Pnew, inno, _ = _KF(x, P, H, R, y, ypred, radian_sel)
     mot.x = xnew
     mot.P = Pnew
+
+    return inno
+
+def KF_rb(moti: MotionModel, 
+            motj: MotionModel, 
+            measi: MeasModel,
+            measj: MeasModel, 
+            y: np.ndarray) -> np.ndarray:
+    """
+    KF for and range/bearing measurement between robot i and j
+    Args:
+        moti (MotionModel): Motion model of the ego robot i 
+        motj (MotionModel): Motion model of the other robot j
+        measi (MeasModel): Measurement model of the robot i
+        measj (MeasModel): Meadurement model of the robot j
+        y (np.ndarray): Incoming measurement
+    Returns:
+        inno (np.ndarray): Innovation
+    """
+    xi = moti.x
+    xj = motj.x
+    tj = measj.t
+    P = moti.P
+    H = measi.get_jacobian_rb(xi, xj, tj)
+    R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
+    ypred = measi.h_rb(xi, xj, tj)
+    radian_sel = measi.radian_sel[:Z_W]
+    xnew, Pnew, inno, _ = _KF(xi, P, H, R, y, ypred, radian_sel)
+    moti.x = xnew
+    moti.P = Pnew
+
+    return inno
+
+def KF_rb_ext(moti: MotionModel, 
+            motj: MotionModel, 
+            measi: MeasModel,
+            measj: MeasModel, 
+            y: np.ndarray) -> np.ndarray:
+    """
+    KF for and range/bearing measurement between robot i and j,
+    that takes both noise sources into account.
+    Used for the naive implementation of collaborative localization
+    Args:
+        moti (MotionModel): Motion model of the ego robot i 
+        motj (MotionModel): Motion model of the other robot j
+        measi (MeasModel): Measurement model of the robot i
+        measj (MeasModel): Meadurement model of the robot j
+        y (np.ndarray): Incoming measurement
+    Returns:
+        inno (np.ndarray): Innovation
+    """
+    xi = moti.x
+    xj = motj.x
+    tj = measj.t
+    P = np.zeros((2*STATE_LEN, 2*STATE_LEN))
+    P[:STATE_LEN, :STATE_LEN] = moti.P #Pii
+    P[STATE_LEN:, STATE_LEN:] = motj.P #Pjj
+    H = measi.get_jacobian_rb_ext(xi, xj, tj)
+    R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
+    ypred = measi.h_rb(xi, xj, tj)
+    radian_sel = measi.radian_sel[:Z_W]
+    # Pad the x state with zeros, so dimensions fit:
+    np.pad(xi, ((0, STATE_LEN), (0, 0)), mode='constant') 
+    xnew, Pnew, inno, _ = _KF(xi, P, H, R, y, ypred, radian_sel)
+    moti.x = xnew[:STATE_LEN,:] #Only update state xi
+    moti.P = Pnew[:STATE_LEN, :STATE_LEN] #Only update Pii
 
     return inno
 
@@ -656,4 +751,4 @@ def ML_rb(b,
     # Use the most likely bearing for final measurement
     z[0] = b_final
 
-    return z
+    return z, ml

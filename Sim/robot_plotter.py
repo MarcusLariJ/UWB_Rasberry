@@ -48,13 +48,18 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b'):
     """
     Args:
         ax (plt.Axes): The ax of the main figure
-        x (np.ndarray): The state to plot 
+        x (np.ndarray): The state to plot (given as theta, px, py)
     """
     d = 2
-    p = x[X_P, 0]
-    theta = x[X_THETA, 0]
-    ax.arrow(p[0], p[1], d*np.cos(theta), d*np.sin(theta), color=color)
-    ax.scatter(p[0], p[1], c=color)
+    len = x.shape[1]
+    theta = x[0,:]
+    px = x[1,:]
+    py = x[2,:]
+
+    ax.scatter(px, py, c=color)
+    for i in range(len):
+        ax.arrow(px[i], py[i], d*np.cos(theta[i]), d*np.sin(theta[i]), color=color)
+    return 
 
 def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b'):
     """
@@ -67,7 +72,7 @@ def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b'):
     """
     pos = x[X_P, 0]
     Pxy = P[X_P, X_P]
-    plot_position(ax, x, color)
+    plot_position(ax, np.concatenate((x[X_THETA:X_THETA+1], x[X_P]),axis=0), color)
     plot_variance_ellipse(ax, Pxy, pos)
 
 def plot_measurement(ax: plt.Axes, xi: np.ndarray, xj: np.ndarray):
@@ -81,4 +86,19 @@ def plot_measurement(ax: plt.Axes, xi: np.ndarray, xj: np.ndarray):
     p1 = xi[X_P,0]
     p2 = xj[X_P,0]
     d = p2 - p1
-    ax.arrow(p1[0], p1[1], d[0], d[1])
+    ax.arrow(p1[0], p1[1], d[0], d[1], linestyle=':')
+
+def plot_measurement2(ax: plt.Axes, x: np.ndarray, r: float, phi: float):
+    """
+    Plot an arrow from robot i to robot j, to visualize a measurement made
+    TODO: Maybe finish this
+    Args:
+        ax (plt.Axes): The ax of the main figure
+        x (np.ndarray): The position of the anchor
+        r (float): Range of measurement
+        phi (float): Angle of measurement (remember to add orientation) 
+    """
+    p = x[X_P,0]
+    d1 = np.cos(phi)*r
+    d2 = np.sin(phi)*r 
+    ax.arrow(p[0], p[1], d1, d2, linestyle=':')

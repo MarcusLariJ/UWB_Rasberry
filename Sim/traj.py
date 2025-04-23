@@ -167,11 +167,12 @@ def gen_noise(y: np.ndarray, bias: np.ndarray = None, sigma: np.ndarray = None, 
         dt (float): Sampling time
     """
     y_size, y_len = y.shape
-    if not (bias == None):
+    if not (bias is None):
         bias_v = np.repeat(bias, y_len, axis=1)
         y += bias_v
-    if not (sigma == None):
-        noise_v = (sigma/dt) @ np.random.rand(y_size, y_len)
+    if not (sigma is None):
+        # Convert variance to std deviation
+        noise_v = np.sqrt(sigma/dt) @ np.random.randn(y_size, y_len)
         y += noise_v
     return y
 
@@ -188,7 +189,7 @@ def gen_rb(thetai, thetaj, posi, posj, ti, tj):
 
     return z
 
-def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj):
+def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0):
     """
     Generate range/bearing measurement with front/back ambiguity.
     This is supposed to be used with the ML before being send to the 
@@ -202,4 +203,12 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj):
     b[1] = np.pi - b[0] # bad measurement TODO: can the wrappingpi function handle inputs oustide -180 to 180?
     r = np.sqrt(np.transpose(q) @ q)
 
+    # apply noise
+    if not (sr==0):
+        r_noise = np.sqrt(sr)*np.random.randn()
+        r += r_noise
+    if not (sb==0):
+        b_noise = np.sqrt(sb)*np.random.randn()
+        b[0] += b_noise
+        b[1] -= b_noise
     return b, r
