@@ -163,8 +163,8 @@ class MeasModel:
         Returns:
             (np.ndarray): The measurement of state xi, xj 
         """
-        self._z[Z_W] = xi[X_W] - xi[X_BW]
-        self._z[Z_A] = RM(-xi[X_THETA][0]) @ xi[X_A] - xi[X_BA]
+        self._z[Z_W] = xi[X_W] + xi[X_BW]
+        self._z[Z_A] = RM(-xi[X_THETA][0]) @ xi[X_A] + xi[X_BA]
         
         # ONly return the part that corresponds to IMU measurement
         return self._z[Z_W:]
@@ -275,8 +275,8 @@ class MeasModel:
             (np.ndarray): The Jacobian matrix evaluated at x0
         """
         thetai = x0[X_THETA][0]
-        self._H[Z_W, X_W] = 1; self._H[Z_W, X_BW] = -1
-        self._H[Z_A, X_THETA:X_THETA+1] = -RMdot(-thetai) @ x0[X_A]; self._H[Z_A, X_A] = RM(-thetai); self._H[Z_A, X_BA] = -np.eye(2) 
+        self._H[Z_W, X_W] = 1; self._H[Z_W, X_BW] = 1
+        self._H[Z_A, X_THETA:X_THETA+1] = -RMdot(-thetai) @ x0[X_A]; self._H[Z_A, X_A] = RM(-thetai); self._H[Z_A, X_BA] = np.eye(2) 
 
         # Return only partial H, corresponding to IMU measurements:
         return self._H[Z_W:,:]
