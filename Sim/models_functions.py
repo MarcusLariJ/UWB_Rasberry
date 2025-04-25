@@ -164,7 +164,7 @@ class MeasModel:
             (np.ndarray): The measurement of state xi, xj 
         """
         self._z[Z_W] = xi[X_W] - xi[X_BW]
-        self._z[Z_A] = RM(-xi[X_THETA][0]) @ (xi[X_A] - xi[X_BA])
+        self._z[Z_A] = RM(-xi[X_THETA][0]) @ xi[X_A] - xi[X_BA]
         
         # ONly return the part that corresponds to IMU measurement
         return self._z[Z_W:]
@@ -276,7 +276,7 @@ class MeasModel:
         """
         thetai = x0[X_THETA][0]
         self._H[Z_W, X_W] = 1; self._H[Z_W, X_BW] = -1
-        self._H[Z_A, X_THETA:X_THETA+1] = RMdot(-thetai) @ (x0[X_A] - x0[X_BA]); self._H[Z_A, X_A] = RM(-thetai); self._H[Z_A, X_BA] = -RM(-thetai) 
+        self._H[Z_A, X_THETA:X_THETA+1] = -RMdot(-thetai) @ x0[X_A]; self._H[Z_A, X_A] = RM(-thetai); self._H[Z_A, X_BA] = -np.eye(2) 
 
         # Return only partial H, corresponding to IMU measurements:
         return self._H[Z_W:,:]
@@ -440,7 +440,7 @@ def _KF(x: np.ndarray,
     # Update state estimate
     xnew = x + K @ inno 
     # Update covariance
-    Pnew = (np.eye(STATE_LEN) - K @ H) @ P
+    Pnew = (np.eye(P.shape[0]) - K @ H) @ P
     # Return new values:
     return xnew, Pnew, inno, K
 
@@ -525,8 +525,8 @@ def KF_rb_ext(moti: MotionModel,
     ypred = measi.h_rb(xi, xj, tj)
     radian_sel = measi.radian_sel[:Z_W]
     # Pad the x state with zeros, so dimensions fit:
-    np.pad(xi, ((0, STATE_LEN), (0, 0)), mode='constant') 
-    xnew, Pnew, inno, _ = _KF(xi, P, H, R, y, ypred, radian_sel)
+    x = np.pad(xi, ((0, STATE_LEN), (0, 0)), mode='constant') 
+    xnew, Pnew, inno, _ = _KF(x, P, H, R, y, ypred, radian_sel)
     moti.x = xnew[:STATE_LEN,:] #Only update state xi
     moti.P = Pnew[:STATE_LEN, :STATE_LEN] #Only update Pii
 
@@ -686,7 +686,7 @@ def _pdf_meas(S: np.ndarray,
     Returns:
         prob (float): Probability of measurement
     """
-    prob = (1/np.sqrt(np.linalg.det(2*np.pi*S))) * np.exp(-(1/2)*np.transpose(inno) @ np.linalg.inv(S) @ inno)
+    prob = (1/2*np.pi)*(1/np.sqrt(np.linalg.det(S))) * np.exp(-(1/2)*np.transpose(inno) @ np.linalg.inv(S) @ inno)
     
     return prob
 

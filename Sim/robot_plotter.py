@@ -14,7 +14,7 @@ def setup_plot() -> tuple[plt.Figure, plt.Axes]:
 
     return fig, ax
 
-def plot_variance_ellipse(ax: plt.Axes, P, x):
+def plot_variance_ellipse(ax: plt.Axes, P, x, color):
     """
     Draw ellipse from covariance matrix.
     Args:
@@ -40,7 +40,7 @@ def plot_variance_ellipse(ax: plt.Axes, P, x):
                             height=2*np.sqrt(lam2), 
                             angle=theta,
                             facecolor='none',
-                            edgecolor='red')
+                            edgecolor=color)
 
     ax.add_patch(ellipse)
 
@@ -56,7 +56,8 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b'):
     px = x[1,:]
     py = x[2,:]
 
-    ax.scatter(px, py, c=color)
+    ax.plot(px, py, color=color)
+    ax.scatter(px, py, c=color, s=1.5)
     for i in range(len):
         ax.arrow(px[i], py[i], d*np.cos(theta[i]), d*np.sin(theta[i]), color=color)
     return 
@@ -73,7 +74,7 @@ def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b'):
     pos = x[X_P, 0]
     Pxy = P[X_P, X_P]
     plot_position(ax, np.concatenate((x[X_THETA:X_THETA+1], x[X_P]),axis=0), color)
-    plot_variance_ellipse(ax, Pxy, pos)
+    plot_variance_ellipse(ax, Pxy, pos, color=color)
 
 def plot_measurement(ax: plt.Axes, xi: np.ndarray, xj: np.ndarray):
     """
@@ -102,3 +103,14 @@ def plot_measurement2(ax: plt.Axes, x: np.ndarray, r: float, phi: float):
     d1 = np.cos(phi)*r
     d2 = np.sin(phi)*r 
     ax.arrow(p[0], p[1], d1, d2, linestyle=':')
+
+def plot_innovation(ax: plt, inno: np.ndarray, var: float, dt=1, color='blue'):
+    """
+    Plots the innovation, and check if it is consistent, that is within +3 std bounds
+    """
+    sigma = np.sqrt(var)
+    sigma_line = np.ones_like(inno)*3*sigma
+    t = np.linspace(0, inno.shape[0]*dt, inno.shape[0])
+    ax.plot(t, inno, color=color)
+    ax.plot(t, sigma_line, color=color, linestyle='--')
+    ax.plot(t, -sigma_line, color=color, linestyle='--')

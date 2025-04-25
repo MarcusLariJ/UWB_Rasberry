@@ -116,7 +116,7 @@ class Robot_single:
             rp.plot_measurement(ax, self.x, a.x)
         return inno
     
-    def robot_meas(self, r: 'Robot_single', ax = None):
+    def robot_meas(self, r: 'Robot_single', ax = None, sr=0, sb=0):
         """
         Implements naive localization - does not take correlations into account.
         """
@@ -126,7 +126,9 @@ class Robot_single:
                            self.path[1:3, self.p_i:self.p_i+1], 
                            r.x[mf.X_P],
                            self.t,
-                           r.t)
+                           r.t,
+                           sr=sr,
+                           sb=sb)
         
         # ML to handle front-back ambiguity
         y_rb, _ = mf.ML_rb(y_b, y_r, self.mot, r.mot, self.meas, r.meas)
