@@ -2,6 +2,7 @@ from models_functions import *
 import matplotlib.pyplot as plt
 import matplotlib.patches as patch
 import numpy as np
+from scipy.stats.distributions import chi2
 
 def setup_plot() -> tuple[plt.Figure, plt.Axes]:
     fig, ax = plt.subplots(figsize=(7, 7))
@@ -104,7 +105,7 @@ def plot_measurement2(ax: plt.Axes, x: np.ndarray, r: float, phi: float):
     d2 = np.sin(phi)*r 
     ax.arrow(p[0], p[1], d1, d2, linestyle=':')
 
-def plot_innovation(ax: plt, inno: np.ndarray, var: float, dt=1, color='blue'):
+def plot_innovation(ax: plt.Axes, inno: np.ndarray, var: float, dt=1, color='blue'):
     """
     Plots the innovation, and check if it is consistent, that is within +3 std bounds
     """
@@ -114,3 +115,45 @@ def plot_innovation(ax: plt, inno: np.ndarray, var: float, dt=1, color='blue'):
     ax.plot(t, inno, color=color)
     ax.plot(t, sigma_line, color=color, linestyle='--')
     ax.plot(t, -sigma_line, color=color, linestyle='--')
+
+def plot_NEES(ax: plt.Axes, 
+              x_est: np.ndarray, 
+              x_true: np.ndarray, 
+              P: np.ndarray, 
+              prob=0.95, dt=1, 
+              color='blue'):
+    """
+    Plots the NEES (Normalized Estimation Error Squared), and plots it along with the confidence bounds
+    For a consistent system, the results should be equal to the degrees of freedom of the system/length of state vector
+    """
+    x = x_true - x_est
+    x_len = x.shape[0]
+    x_num = x.shape[1]
+    P_num = P.shape[2]
+    nees = np.zeros(x_num)
+    a = 1-prob
+    if x_num == P_num:
+        t = np.linspace(0, x_num*dt, x_num)
+        check_inv = True
+        for i in range(x_num):
+            if check_inv:
+                # Initially, the P matrix is not invertible (fx all 0s). 
+                # Make a check just in case for the first few cases:
+                if np.linalg.det(P[:,:,i]) == 0:
+                    nees[i] = -1
+                    continue
+                else:
+                    check_inv = False 
+            nees[i] = x[:,i:i+1].T @ np.linalg.inv(P[:,:,i]) @ x[:,i:i+1]
+        # Calculate thresholds:
+        r1 = chi2.ppf(a/2.0, df=x_len)
+        r2 = chi2.ppf(1-a/2.0, df=x_len)
+        r1_line = np.ones_like(nees)*r1
+        r2_line = np.ones_like(nees)*r2
+        # Plot anees
+        ax.plot(t, nees, color=color)
+        ax.plot(t, r1_line, color=color, linestyle='--')
+        ax.plot(t, r2_line, color=color, linestyle='--')
+    else:
+        print("Number of x did not match number of P")
+    

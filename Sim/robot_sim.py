@@ -114,6 +114,9 @@ class Robot_single:
         inno = mf.KF_rb(self.mot, a.mot, self.meas, a.meas, y_rb)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
+        # Log updated quantities:        
+        self.x_log[:,self.p_i:self.p_i+1] = self.x
+        self.P_log[:,:,self.p_i] = self.P
         return inno
     
     def robot_meas(self, r: 'Robot_single', ax = None, sr=0, sb=0):
@@ -135,6 +138,9 @@ class Robot_single:
         inno = mf.KF_rb_ext(self.mot, r.mot, self.meas, r.meas, y_rb)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, r.x)
+        # Log updated quantities:        
+        self.x_log[:,self.p_i:self.p_i+1] = self.x
+        self.P_log[:,:,self.p_i] = self.P
         return inno
 
 
