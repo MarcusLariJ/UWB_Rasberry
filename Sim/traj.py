@@ -198,9 +198,9 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0):
     # Precompute q
     q = (posj + mf.RM(thetaj) @ tj - posi - mf.RM(thetai) @ ti)
     # Range and bearing:
-    b = np.zeros(2) # two ambiguities
-    b[0] = np.arctan2(q[1], q[0]) - thetai # true measurement
-    b[1] = np.pi - b[0] # bad measurement TODO: can the wrappingpi function handle inputs oustide -180 to 180?
+    ys = np.zeros((2,2)) # two ambiguities
+    ys[0,0] = np.arctan2(q[1], q[0]) - thetai # true measurement
+    ys[0,1] = np.pi - ys[0,0] # bad measurement TODO: can the wrappingpi function handle inputs oustide -180 to 180?
     r = np.sqrt(np.transpose(q) @ q)
 
     # apply noise
@@ -209,6 +209,8 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0):
         r += r_noise
     if not (sb==0):
         b_noise = np.sqrt(sb)*np.random.randn()
-        b[0] += b_noise
-        b[1] -= b_noise
-    return b, r
+        ys[0,0] += b_noise
+        ys[0,1] -= b_noise
+    ys[1,0] = r
+    ys[1,1] = r
+    return ys

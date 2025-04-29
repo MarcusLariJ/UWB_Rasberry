@@ -100,7 +100,7 @@ class Robot_single:
 
     def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0):
         # Get ambigious measurement
-        y_b, y_r = traj.gen_rb_amb(self.path[0,self.p_i], 
+        ys = traj.gen_rb_amb(self.path[0,self.p_i], 
                            a.x[mf.X_THETA, 0], 
                            self.path[1:3, self.p_i:self.p_i+1], 
                            a.x[mf.X_P],
@@ -110,8 +110,8 @@ class Robot_single:
                            sb=sb)
         
         # ML to handle front-back ambiguity
-        y_rb, _ = mf.ML_rb(y_b, y_r, self.mot, a.mot, self.meas, a.meas)
-        inno, _, _ = mf.KF_rb(self.mot, a.mot, self.meas, a.meas.t, y_rb)
+        #y_rb, _ = mf.ML_rb(ys, self.mot, a.mot.x, self.meas, a.meas.t)
+        inno, _, _ = mf.KF_rb(self.mot, a.mot.x, self.meas, a.meas.t, ys)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
         # Log updated quantities:        
@@ -124,7 +124,7 @@ class Robot_single:
         Implements naive localization - does not take correlations into account.
         """
         # Get ambigious measurement
-        y_b, y_r = traj.gen_rb_amb(self.path[0,self.p_i], 
+        ys = traj.gen_rb_amb(self.path[0,self.p_i], 
                            r.x[mf.X_THETA, 0], 
                            self.path[1:3, self.p_i:self.p_i+1], 
                            r.x[mf.X_P],
@@ -134,8 +134,8 @@ class Robot_single:
                            sb=sb)
         
         # ML to handle front-back ambiguity
-        y_rb, _ = mf.ML_rb(y_b, y_r, self.mot, r.mot, self.meas, r.meas)
-        inno, _, _ = mf.KF_rb_ext(self.mot, r.mot, self.meas, r.meas.t, y_rb)
+        #y_rb, _ = mf.ML_rb(ys, self.mot, r.mot.x, self.meas, r.meas.t)
+        inno, _, _ = mf.KF_rb_ext(self.mot, r.mot, self.meas, r.meas.t, ys)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, r.x)
         # Log updated quantities:        
@@ -176,7 +176,7 @@ class robot_luft(Robot_single):
         inno = 0
         if self.p_i < self.p_len-1:
             self.mot.predict()
-            self.mot.propagate_rom() #<--- notice rom function here
+            self.mot.propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
             if imu_correct:
                 inno, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1])
 
@@ -190,7 +190,82 @@ class robot_luft(Robot_single):
             print("End of trajectory!!")
 
         return inno
+    
+    def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0):
+        """
+        Make measurement to anchor and use Rom methods for updating correlations
+        """
+        # Get ambigious measurement
+        ys = traj.gen_rb_amb(self.path[0,self.p_i], 
+                           a.x[mf.X_THETA, 0], 
+                           self.path[1:3, self.p_i:self.p_i+1], 
+                           a.x[mf.X_P],
+                           self.t,
+                           a.t,
+                           sr=sr,
+                           sb=sb)
+        
+        inno, _, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num)
+        if not (ax==None):
+            rp.plot_measurement(ax, self.x, a.x)
+        # Log updated quantities:        
+        self.x_log[:,self.p_i:self.p_i+1] = self.x
+        self.P_log[:,:,self.p_i] = self.P
+        return inno
+    
+    def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0):
+        """
+        Implements Lufts et al algorithm for CL localization
+        """
+        # Get ambigious measurement
+        ys = traj.gen_rb_amb(self.path[0,self.p_i], 
+                           r.x[mf.X_THETA, 0], 
+                           self.path[1:3, self.p_i:self.p_i+1], 
+                           r.x[mf.X_P],
+                           self.t,
+                           r.t,
+                           sr=sr,
+                           sb=sb)
+        # Request quantities from other robot:
+        xj, Pjj, sigmaji, idj, tj = r.send_requested(self.id)
+        # KF update
+        xj_new, Pjj_new, cor_num, inno, _ = mf.KF_relative_luft(self.moti, 
+                                                                self.measi, 
+                                                                idj, 
+                                                                xj,
+                                                                Pjj,
+                                                                sigmaji, 
+                                                                tj,
+                                                                ys, 
+                                                                self.id_list,
+                                                                self.s_list,
+                                                                self.id_num)
+        self.id_num = cor_num
+        # send updated quantities back to j
+        r.recieve_update(xj_new, Pjj_new, self.id)
 
+        if not (ax==None):
+            rp.plot_measurement(ax, self.x, r.x)
+        # Log updated quantities:        
+        self.x_log[:,self.p_i:self.p_i+1] = self.x
+        self.P_log[:,:,self.p_i] = self.P
+        return inno
+
+    def recieve_update(self, xnew, Pnew, idj):
+        """
+        Update own values after a succesfull measurement
+        """
+        mf.recieve_meas(self.mot, idj, xnew, Pnew, self.id_list, self.s_list, self.id_num)
+    
+    def send_requested(self, idj):
+        """
+        Send requested values, when initially making a measurement
+        """
+        xi, Pii, sigmaij, cor_num = mf.request_meas(self.mot, self.id_list, self.s_list, self.id_num, idj)
+        self.id_num = cor_num
+        idi = self.id
+        ti = self.t
+        return xi, Pii, sigmaij, idi, ti
 
 def MSE_pos(x_true, x_predicted):
     """

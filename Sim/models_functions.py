@@ -453,6 +453,38 @@ def _KF(x: np.ndarray,
     # Return new values:
     return xnew, Pnew, inno, K
 
+def _KF_ml(x: np.ndarray, 
+       P: np.ndarray, 
+       H: np.ndarray, 
+       R: np.ndarray, 
+       ys: np.ndarray,
+       ypred: np.ndarray,
+       radian_sel: np.ndarray):
+    """
+    Computes the Kalman gain and updates the states and covariance.
+    Includes the ML step
+    Args: 
+        x (np.ndarray): States to update
+        P (np.ndarray): Process noise to update
+        H (np.ndarray): Jacobian of output matrix
+        ys (np.ndarray): matrix of possible measured outputs
+        radian_sel (np.ndarray): Array indicating which states are given in radians
+    """
+    S = H @ P @ np.transpose(H) + R
+    # Run ML step:
+    r_sel = radian_sel
+    y, _ = ML_rb_gen(ys, ypred, S, r_sel)
+    # Then carry on with the Kalman Filter
+    inno = subtractState(y, ypred, r_sel)
+    # Compute gain:
+    K = P @ np.transpose(H) @ np.linalg.inv(S)
+    # Update state estimate
+    xnew = x + K @ inno 
+    # Update covariance
+    Pnew = (np.eye(P.shape[0]) - K @ H) @ P
+    # Return new values:
+    return xnew, Pnew, inno, K
+
 def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
     """
     Simple KF for when IMU measurements come in
@@ -478,10 +510,10 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
     return inno, K, H
 
 def KF_rb(moti: MotionModel, 
-            motj: MotionModel, 
+            xj: MotionModel, 
             measi: MeasModel,
             tj: np.ndarray, 
-            y: np.ndarray) -> np.ndarray:
+            ys: np.ndarray) -> np.ndarray:
     """
     KF for and range/bearing measurement between robot i and anchor j
     Assumes no uncertainty about state vector of j!
@@ -497,13 +529,12 @@ def KF_rb(moti: MotionModel,
         H (np.ndarray):
     """
     xi = moti.x
-    xj = motj.x
     P = moti.P
     H = measi.get_jacobian_rb(xi, xj, tj)
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
     ypred = measi.h_rb(xi, xj, tj)
     radian_sel = measi.radian_sel[:Z_W]
-    xnew, Pnew, inno, K = _KF(xi, P, H, R, y, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel)
     moti.x = xnew
     moti.P = Pnew
 
@@ -513,7 +544,7 @@ def KF_rb_ext(moti: MotionModel,
             motj: MotionModel, 
             measi: MeasModel,
             tj: np.ndarray, 
-            y: np.ndarray) -> np.ndarray:
+            ys: np.ndarray) -> np.ndarray:
     """
     KF for and range/bearing measurement between robot i and j,
     that takes both noise sources into account.
@@ -540,7 +571,7 @@ def KF_rb_ext(moti: MotionModel,
     radian_sel = measi.radian_sel[:Z_W]
     # Pad the x state with zeros, so dimensions fit:
     x = np.pad(xi, ((0, STATE_LEN), (0, 0)), mode='constant') 
-    xnew, Pnew, inno, K = _KF(x, P, H, R, y, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel)
     moti.x = xnew[:STATE_LEN,:] #Only update state xi
     moti.P = Pnew[:STATE_LEN, :STATE_LEN] #Only update Pii
 
@@ -550,7 +581,7 @@ def KF_full(moti: MotionModel,
             motj: MotionModel, 
             measi: MeasModel,
             measj: MeasModel, 
-            y: np.ndarray) -> np.ndarray:
+            ys: np.ndarray) -> np.ndarray:
     """
     KF for both IMU for robot i and range/bearing measurement between robot i and j
     Args:
@@ -571,7 +602,7 @@ def KF_full(moti: MotionModel,
     R = measi.R
     ypred = measi.h_full(xi, xj, tj)
     radian_sel = measi.radian_sel
-    xnew, Pnew, inno, K = _KF(xi, P, H, R, y, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel)
     moti.x = xnew
     moti.P = Pnew
 
@@ -641,10 +672,10 @@ def KF_IMU_rom(mot: MotionModel,
     return inno, K
 
 def KF_rb_rom(moti: MotionModel, 
-            motj: MotionModel, 
+            xj: np.ndarray, 
             measi: MeasModel,
             tj: np.ndarray, 
-            y: np.ndarray,
+            ys: np.ndarray,
             cor_list: np.ndarray,
             cor_num: int) -> np.ndarray:
     """
@@ -663,7 +694,7 @@ def KF_rb_rom(moti: MotionModel,
         H (np.ndarray):
     """
     # Run normal KF robot to anchor measurement
-    inno, K, H = KF_rb(moti, motj, measi, tj, y)
+    inno, K, H = KF_rb(moti, xj, measi, tj, ys)
     # Then update correlations
     rom_private(K, H, cor_list, cor_num)
 
@@ -676,7 +707,7 @@ def KF_relative_luft(moti: MotionModel,
             Pjj: np.ndarray,
             sigmaji: np.ndarray,
             tj: np.ndarray,
-            y: np.ndarray,
+            ys: np.ndarray,
             id_list: dict,
             cor_list: np.ndarray,
             cor_num: int):
@@ -685,7 +716,7 @@ def KF_relative_luft(moti: MotionModel,
     Args:
         moti (MotionModel): Motion model of the ego robot i 
         measi (MeasModel): Measurement model of the robot i
-        idj: (int): id of other robot j
+        idj (int): id of other robot j
         xj (np.ndarray): State vector of other robot j
         Pjj (np.ndarray): Covariance of other robot j
         sigmaji (np.ndarray): correlation to other robot j
@@ -694,10 +725,11 @@ def KF_relative_luft(moti: MotionModel,
         cor_list (np.ndarray): List of inter-robot correlations
         cor_num (int): length of list 
     Returns:
+        xj_new (np.ndarray): New xj
+        Pjj_new (np.ndarray): new Pjj. Use to update robot j
+        cor_num (int): new length of list
         inno (np.ndarray): Innovation
         K (np.ndarray): Kalman gain vector
-        H (np.ndarray):
-        cor_num (int): length of list
     """
     # First, check if we have made a measurement to this robot before:
     if idj not in id_list.keys():
@@ -724,7 +756,7 @@ def KF_relative_luft(moti: MotionModel,
     ypred = measi.h_rb(moti.x, xj, tj)
     R = measi.R
     rad_sel = measi.radian_sel
-    xnew, Pnew, inno, K = _KF(xa, Paa, Ha, R, y, ypred, rad_sel)
+    xnew, Pnew, inno, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel)
     # Now, split up the results:
     moti.x = xnew[:STATE_LEN, 0:1]
     xj_new = xnew[STATE_LEN:, 0:1]
@@ -737,7 +769,7 @@ def KF_relative_luft(moti: MotionModel,
     luft_relative(Pii_new, Pii, idj, id_list, cor_list, cor_num)
     
     # xj_new and Pjj_new should be transmitted to the other robot
-    return xj_new, Pjj_new, inno, K 
+    return xj_new, Pjj_new, cor_num, inno, K 
 
 def recieve_meas(moti: MotionModel,
                 idj: int,
@@ -753,10 +785,7 @@ def recieve_meas(moti: MotionModel,
     moti.x = xi_new
     moti.P = Pii_new
     if idj not in id_list.keys():
-        print("Adding new robot: " + str(idj))
-        idx = cor_num
-        id_list[idj] = idx
-        cor_num += 1 # TODO: No limit on growt, but np array has a max! Add limit check here
+        print("ERROR: this id should exist:" + str(idj))
     else: 
         idx = id_list[idj]
     cor_list[:,:,idx] = np.eye(STATE_LEN) # This is due to the chosen decomposition of the correlation
@@ -765,6 +794,29 @@ def recieve_meas(moti: MotionModel,
 
     return # robot should not send anything back at this point
 
+def request_meas(mot: MotionModel, 
+                 id_list: dict,
+                 cor_list: np.ndarray,
+                 cor_num: int, 
+                 idj: int):
+    """
+    Function that should run before the measurement is made
+    """
+    xi = mot.x
+    Pii = mot.P
+    # First, check if we have made a measurement to this robot before:
+    if idj not in id_list.keys():
+        print("Adding new robot: " + str(idj))
+        idx = cor_num
+        id_list[idj] = idx
+        cor_num += 1 # TODO: No limit on growt, but np array has a max! Add limit check here
+        sigmaij = np.zeros((STATE_LEN, STATE_LEN))
+        cor_list[:,:,idx] = sigmaij # Mostly uncesesarry, since there is already zeros here 
+    else: 
+        idx = id_list[idj]
+        sigmaij = cor_list[:,:,idx]
+    
+    return xi, Pii, sigmaij, cor_num
 
 #### Fake measurements ####
 
@@ -818,34 +870,6 @@ def gen_IMU_meas(pos: np.ndarray,
 
 #### ML estimators ####
 
-def _pdf_meas_1D(P: np.ndarray, 
-        H: np.ndarray, 
-        r: float, 
-        z: float,
-        zpred: float,
-        radian_sel: int):
-    """
-    Calculate the probability for the measurement, to be used in ML.
-    This function is only for use for single-variable distributions
-    Args:
-        P (np.ndarray): Process noise
-        H (np.ndarray): Jacobian of output matrix (only for bearing!!)
-        r (float): Measured output noise
-        y (np.ndarray): Measured output
-        radian_sel (int): 0 for normal substraction, 1 for radian substraction
-    Returns:
-        prob (float): Probability of measurement
-    """
-    
-    # Special substraction for radians:
-    if radian_sel == 1:
-        diff = ((z - zpred + np.pi) % (2*np.pi)) - np.pi #TODO maybe reuse wrappingpi here
-    else:
-        diff = z - zpred
-    prob = (1/np.sqrt(2*np.pi*r))*np.exp(-(diff**2)/(2*r))
-    
-    return prob
-
 def _pdf_meas(S: np.ndarray,
         inno: np.ndarray):
     """
@@ -861,65 +885,70 @@ def _pdf_meas(S: np.ndarray,
     
     return prob
 
-def ML_bearing(b, 
-               r, 
+def ML_rb(ys: np.ndarray, 
                moti: MotionModel, 
-               motj: MotionModel,
+               xj: np.ndarray,
                measi: MeasModel,
-               measj: MeasModel):
-    """
-    Uses ML to find the most likely bearing, based on the prediction 
-    from the motion model 
-    """
-    P = moti.P
-    H = measi.get_jacobian_bearing()
-    r_phi = measi.R[Z_PHI, Z_PHI] #TODO: right now, use the same noise for all possible measurements
-    zpred_phi = measi.h_bearing(moti.x, motj.x, measj.t)
-
-    z = np.zeros((2,1))
-    z_n = b.shape[0]
-    ml = 0
-    for bi in b:
-        p = _pdf_meas_1D(P, H, r_phi, bi, zpred_phi, 1)
-        if p > ml:
-            ml = p
-    z[0] = ml
-    z[1] = r
-
-    return z
-
-def ML_rb(b, 
-               r, 
-               moti: MotionModel, 
-               motj: MotionModel,
-               measi: MeasModel,
-               measj: MeasModel):
+               tj: np.ndarray):
     """
     Uses ML to find the most likely range/bearing, based on the prediction 
     from the motion model 
     """
     P = moti.P
-    H = measi.get_jacobian_rb(moti.x, motj.x, measj.t)
-    zpred = measi.h_rb(moti.x, motj.x, measj.t)
+    H = measi.get_jacobian_rb(moti.x, xj, tj)
+    zpred = measi.h_rb(moti.x, xj, tj)
     rad_sel = measi.radian_sel[:Z_W]
 
     R = measi.R[:Z_W, :Z_W] #TODO: right now, use the same noise for all possible measurements
     S = H @ P @ np.transpose(H) + R
 
-    z = np.zeros((2,1))
-    z[1] = r
-    b_final = 0
+    ylen = ys.shape[1]
+    if ylen == 1:
+        # if there is only one measurement, then just return
+        ml = -1
+        return ys, ml
+    # Otherwise carry on
+    i_final = -1
     ml = 0
-    for bi in b:
-        z[0] = bi
-        inno = subtractState(z, zpred, rad_sel)
+    for i in range(ylen):
+        inno = subtractState(ys[:,i:i+1], zpred, rad_sel)
         # Calculate likelihood
         p = _pdf_meas(S, inno)
         # If larger than previous maximum, then update the bearing to be used
         if p > ml:
             ml = p
-            b_final = bi
+            i_final = i
     # Use the most likely bearing for final measurement
-    z[0] = b_final
+    z = ys[:,i_final:i_final+1]
+
+    return z, ml
+
+def ML_rb_gen(ys,
+            zpred,
+            S, 
+            rad_sel):
+    """
+    Uses ML to find the most likely range/bearing, based on the prediction 
+    from the motion model.
+    More general form. Reuses S, zpred calculated for Kalman filtering
+    """
+    ylen = ys.shape[1]
+    if ylen == 1:
+        # if there is only one measurement, then just return
+        ml = -1
+        return ys, ml
+    # Otherwise carry on
+    i_final = -1
+    ml = 0
+    for i in range(ylen):
+        inno = subtractState(ys[:,i:i+1], zpred, rad_sel)
+        # Calculate likelihood
+        p = _pdf_meas(S, inno)
+        # If larger than previous maximum, then update the bearing to be used
+        if p > ml:
+            ml = p
+            i_final = i
+    # Use the most likely bearing for final measurement
+    z = ys[:,i_final:i_final+1]
 
     return z, ml
