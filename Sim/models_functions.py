@@ -402,8 +402,6 @@ class MotionModel:
     def propagate(self) -> np.ndarray:
         """
         Propagate process noise
-        Args:
-            Q (np.ndarray): Input noise
         Returns:
             Updated state covariance
         """
@@ -412,6 +410,17 @@ class MotionModel:
         self._P = Pnew
         return Pnew
 
+    def propagate_rom(self, cor: np.ndarray, cor_N: int):
+        """
+        Runs the normal propagate step and updates every correlation using Rom's method
+        Args:
+            cor (np.ndarray): list of inter-robot correlations
+            cor_N (np.ndarray): number of inter-robot correlations
+        """
+        Pnew = self.propagate()
+        for i in range(cor_N):
+            cor[:,:,i] = self._A @ cor[:,:,i]
+        return Pnew
 
 #### Kalman Filters ####
 
@@ -453,6 +462,7 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
         y (np.ndarray): Incoming measurement
     Returns:
         inno (np.ndarray): Innovation
+        K (np.ndarray): Kalman gain vector
     """
     x = mot.x
     P = mot.P
@@ -460,11 +470,11 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
     R = meas.R[Z_W:,Z_W:] # Only use noise related to IMU
     ypred = meas.h_IMU(x)
     radian_sel = meas.radian_sel[Z_W:]
-    xnew, Pnew, inno, _ = _KF(x, P, H, R, y, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF(x, P, H, R, y, ypred, radian_sel)
     mot.x = xnew
     mot.P = Pnew
 
-    return inno
+    return inno, K
 
 def KF_rb(moti: MotionModel, 
             motj: MotionModel, 
@@ -472,7 +482,8 @@ def KF_rb(moti: MotionModel,
             measj: MeasModel, 
             y: np.ndarray) -> np.ndarray:
     """
-    KF for and range/bearing measurement between robot i and j
+    KF for and range/bearing measurement between robot i and anchor j
+    Assumes no uncertainty about state vector of j!
     Args:
         moti (MotionModel): Motion model of the ego robot i 
         motj (MotionModel): Motion model of the other robot j
@@ -481,6 +492,7 @@ def KF_rb(moti: MotionModel,
         y (np.ndarray): Incoming measurement
     Returns:
         inno (np.ndarray): Innovation
+        K (np.ndarray): Kalman gain vector
     """
     xi = moti.x
     xj = motj.x
@@ -490,11 +502,11 @@ def KF_rb(moti: MotionModel,
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
     ypred = measi.h_rb(xi, xj, tj)
     radian_sel = measi.radian_sel[:Z_W]
-    xnew, Pnew, inno, _ = _KF(xi, P, H, R, y, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF(xi, P, H, R, y, ypred, radian_sel)
     moti.x = xnew
     moti.P = Pnew
 
-    return inno
+    return inno, K
 
 def KF_rb_ext(moti: MotionModel, 
             motj: MotionModel, 
@@ -513,6 +525,7 @@ def KF_rb_ext(moti: MotionModel,
         y (np.ndarray): Incoming measurement
     Returns:
         inno (np.ndarray): Innovation
+        K (np.ndarray): Kalman gain vector
     """
     xi = moti.x
     xj = motj.x
@@ -526,11 +539,11 @@ def KF_rb_ext(moti: MotionModel,
     radian_sel = measi.radian_sel[:Z_W]
     # Pad the x state with zeros, so dimensions fit:
     x = np.pad(xi, ((0, STATE_LEN), (0, 0)), mode='constant') 
-    xnew, Pnew, inno, _ = _KF(x, P, H, R, y, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF(x, P, H, R, y, ypred, radian_sel)
     moti.x = xnew[:STATE_LEN,:] #Only update state xi
     moti.P = Pnew[:STATE_LEN, :STATE_LEN] #Only update Pii
 
-    return inno
+    return inno, K
 
 def KF_full(moti: MotionModel, 
             motj: MotionModel, 
@@ -547,6 +560,7 @@ def KF_full(moti: MotionModel,
         y (np.ndarray): Incoming measurement
     Returns:
         inno (np.ndarray): Innovation
+        K (np.ndarray): Kalman gain vector
     """
     xi = moti.x
     xj = motj.x
@@ -556,11 +570,49 @@ def KF_full(moti: MotionModel,
     R = measi.R
     ypred = measi.h_full(xi, xj, tj)
     radian_sel = measi.radian_sel
-    xnew, Pnew, inno, _ = _KF(xi, P, H, R, y, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF(xi, P, H, R, y, ypred, radian_sel)
     moti.x = xnew
     moti.P = Pnew
 
-    return inno
+    return inno, K
+
+def rom_private(K: np.ndarray, H: np.ndarray, cor: np.ndarray, cor_len: int):
+    """
+    Function for updating all inter-robot correlations when a private measurement is made, 
+    according to Rom paper
+    Args:
+        K (np.ndarray): Kalman gains
+        H (np.ndarray): 
+        cor (np.ndarray): array of inter-robot correlations
+        cor_len (int): number of inter-robot correlations
+    """
+    for i in range(cor_len):
+        cor[:,:,i] = (np.eye(K.shape[0]) - K @ H) @ cor[:,:,i]
+
+def luft_relative(Pii_new: np.ndarray, 
+                  Pii_old: np.ndarray, 
+                  other_id: int,
+                  id_list: np.ndarray,
+                  cor: np.ndarray, 
+                  cor_len: int):
+    """
+    Function for updating all inter-robot correlations when a private measurement is made, 
+    between participating and non-participating robots (sigma_ik).
+    Uses the block-diagonal approximation introduced by Luft et al.
+    Args:
+        Pii_new (np.ndarray): The updated covariance matrix
+        Pii_old (np.ndarray): The non-updated covariance matrix
+        other_id (int): ID of participating robot. Used for ignoring approximating this correlation, since we already know it exact
+        id_list (np.ndarray): 
+        cor (np.ndarray): array of inter-robot correlations
+        cor_len (int): number of inter-robot correlations
+    """
+    P_approx = Pii_new @ np.linalg.inv(Pii_old)
+    for i in range(cor_len):
+        # make sure to ignore the ID of the participating robot:
+        if not id_list[i] == other_id:
+            cor[:,:,i] = P_approx @ cor[:,:,i]
+
 
 def centralizedKF(moti: MotionModel, motj: MotionModel, meas: MeasModel, y: np.ndarray):
     """
