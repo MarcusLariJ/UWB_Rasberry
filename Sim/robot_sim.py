@@ -82,7 +82,7 @@ class Robot_single:
             self.mot.predict()
             self.mot.propagate()
             if imu_correct:
-                inno, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1])
+                inno, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1])
 
             self.p_i += 1 
 
@@ -111,7 +111,7 @@ class Robot_single:
         
         # ML to handle front-back ambiguity
         y_rb, _ = mf.ML_rb(y_b, y_r, self.mot, a.mot, self.meas, a.meas)
-        inno, _ = mf.KF_rb(self.mot, a.mot, self.meas, a.meas, y_rb)
+        inno, _, _ = mf.KF_rb(self.mot, a.mot, self.meas, a.meas.t, y_rb)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
         # Log updated quantities:        
@@ -135,7 +135,7 @@ class Robot_single:
         
         # ML to handle front-back ambiguity
         y_rb, _ = mf.ML_rb(y_b, y_r, self.mot, r.mot, self.meas, r.meas)
-        inno, _ = mf.KF_rb_ext(self.mot, r.mot, self.meas, r.meas, y_rb)
+        inno, _, _ = mf.KF_rb_ext(self.mot, r.mot, self.meas, r.meas.t, y_rb)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, r.x)
         # Log updated quantities:        
@@ -165,7 +165,8 @@ class robot_luft(Robot_single):
         # Setup list of robots we have met
         self.id = id
         self.id_len = 10 # Allocate memory for 10 robots
-        self.id_list = np.zeros(self.id_len, dtype=int) # list for IDs
+        self.id_num = 0 # current length of dictionary
+        self.id_list = {}
         self.s_list = np.zeros((mf.STATE_LEN, mf.STATE_LEN, self.id_len)) # list for interrobot correleations (sigmaij)
 
     def predict(self, imu_correct=True):
@@ -177,7 +178,7 @@ class robot_luft(Robot_single):
             self.mot.predict()
             self.mot.propagate_rom() #<--- notice rom function here
             if imu_correct:
-                inno, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1])
+                inno, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1])
 
             self.p_i += 1 
 

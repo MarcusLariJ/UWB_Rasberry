@@ -463,6 +463,7 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
     Returns:
         inno (np.ndarray): Innovation
         K (np.ndarray): Kalman gain vector
+        H (np.ndarray): Output matrix
     """
     x = mot.x
     P = mot.P
@@ -474,12 +475,12 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
     mot.x = xnew
     mot.P = Pnew
 
-    return inno, K
+    return inno, K, H
 
 def KF_rb(moti: MotionModel, 
             motj: MotionModel, 
             measi: MeasModel,
-            measj: MeasModel, 
+            tj: np.ndarray, 
             y: np.ndarray) -> np.ndarray:
     """
     KF for and range/bearing measurement between robot i and anchor j
@@ -493,10 +494,10 @@ def KF_rb(moti: MotionModel,
     Returns:
         inno (np.ndarray): Innovation
         K (np.ndarray): Kalman gain vector
+        H (np.ndarray):
     """
     xi = moti.x
     xj = motj.x
-    tj = measj.t
     P = moti.P
     H = measi.get_jacobian_rb(xi, xj, tj)
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
@@ -506,12 +507,12 @@ def KF_rb(moti: MotionModel,
     moti.x = xnew
     moti.P = Pnew
 
-    return inno, K
+    return inno, K, H
 
 def KF_rb_ext(moti: MotionModel, 
             motj: MotionModel, 
             measi: MeasModel,
-            measj: MeasModel, 
+            tj: np.ndarray, 
             y: np.ndarray) -> np.ndarray:
     """
     KF for and range/bearing measurement between robot i and j,
@@ -526,10 +527,10 @@ def KF_rb_ext(moti: MotionModel,
     Returns:
         inno (np.ndarray): Innovation
         K (np.ndarray): Kalman gain vector
+        H (np.ndarray):
     """
     xi = moti.x
     xj = motj.x
-    tj = measj.t
     P = np.zeros((2*STATE_LEN, 2*STATE_LEN))
     P[:STATE_LEN, :STATE_LEN] = moti.P #Pii
     P[STATE_LEN:, STATE_LEN:] = motj.P #Pjj
@@ -543,7 +544,7 @@ def KF_rb_ext(moti: MotionModel,
     moti.x = xnew[:STATE_LEN,:] #Only update state xi
     moti.P = Pnew[:STATE_LEN, :STATE_LEN] #Only update Pii
 
-    return inno, K
+    return inno, K, H
 
 def KF_full(moti: MotionModel, 
             motj: MotionModel, 
@@ -575,6 +576,9 @@ def KF_full(moti: MotionModel,
     moti.P = Pnew
 
     return inno, K
+
+
+#### KF for collaborative localization ####
 
 def rom_private(K: np.ndarray, H: np.ndarray, cor: np.ndarray, cor_len: int):
     """
@@ -613,38 +617,153 @@ def luft_relative(Pii_new: np.ndarray,
         if not id_list[i] == other_id:
             cor[:,:,i] = P_approx @ cor[:,:,i]
 
+def KF_IMU_rom(mot: MotionModel, 
+               meas: MeasModel, 
+               y: np.ndarray,
+               cor_list: np.ndarray,
+               cor_num: int) -> np.ndarray:
+    """
+    KF for when IMU measurements come in. 
+    Also updates all inter-robot correlations 
+    Args:
+        mot (MotionModel): Motion model of the robot 
+        meas (MeasModel): Measurement model of the robot
+        y (np.ndarray): Incoming measurement
+    Returns:
+        inno (np.ndarray): Innovation
+        K (np.ndarray): Kalman gain vector
+    """
+    # Run normal KF IMU 
+    inno, K, H = KF_IMU(mot, meas, y)
+    # Update correlations between robots
+    rom_private(K, H, cor_list, cor_num)
 
-def centralizedKF(moti: MotionModel, motj: MotionModel, meas: MeasModel, y: np.ndarray):
-    """
-    Computes the Kalman gain and updates the states and covariance.
-    This filter is for implementing a collaborative centralized KF 
-    that tracks all the eX_Act correlations between robots
-    Args: 
-        moti (MotionModel): The motion model to use for the robot i recieving the measurement from j
-        motj (MotionModel): The motion model to use for the robot j sending the measurement to i
-        meas (MeasModel): The measurement model to use
-        y (np.ndarray): the measurement recived by the sensors 
-    """
-    Pii = 0 
-    Pij = 0
-    Pji = 0
-    Pjj = 0
-    xinew = 0
-    xjnew = 0
+    return inno, K
 
-    return xinew, xjnew, Pii, Pij, Pji, Pjj
+def KF_rb_rom(moti: MotionModel, 
+            motj: MotionModel, 
+            measi: MeasModel,
+            tj: np.ndarray, 
+            y: np.ndarray,
+            cor_list: np.ndarray,
+            cor_num: int) -> np.ndarray:
+    """
+    KF for and range/bearing measurement between robot i and anchor j
+    Assumes no uncertainty about state vector of j!
+    Uses Rom method for updating all inter-robot correlations
+    Args:
+        moti (MotionModel): Motion model of the ego robot i 
+        motj (MotionModel): Motion model of the other robot j
+        measi (MeasModel): Measurement model of the robot i
+        measj (MeasModel): Meadurement model of the robot j
+        y (np.ndarray): Incoming measurement
+    Returns:
+        inno (np.ndarray): Innovation
+        K (np.ndarray): Kalman gain vector
+        H (np.ndarray):
+    """
+    # Run normal KF robot to anchor measurement
+    inno, K, H = KF_rb(moti, motj, measi, tj, y)
+    # Then update correlations
+    rom_private(K, H, cor_list, cor_num)
 
-def luftKF():
+    return inno, K
+
+def KF_relative_luft(moti: MotionModel,  
+            measi: MeasModel,
+            idj: int,
+            xj: np.ndarray,
+            Pjj: np.ndarray,
+            sigmaji: np.ndarray,
+            tj: np.ndarray,
+            y: np.ndarray,
+            id_list: dict,
+            cor_list: np.ndarray,
+            cor_num: int):
     """
-    Computes the Kalman gain and updates the states and covariance.
-    This filter implements the collaborative localiZ_Ation scheme used by Lukas Luft et al. (2018), 
-    where the inter-robot correlations are approximated.
-    Args: 
-        mot (MotionModel): The motion model to use
-        meas (MeasModel): The measurement model to use
-        y (np.ndarray): the measurement recived by the sensors 
+    The big scary function!
+    Args:
+        moti (MotionModel): Motion model of the ego robot i 
+        measi (MeasModel): Measurement model of the robot i
+        idj: (int): id of other robot j
+        xj (np.ndarray): State vector of other robot j
+        Pjj (np.ndarray): Covariance of other robot j
+        sigmaji (np.ndarray): correlation to other robot j
+        y (np.ndarray): Incoming measurement
+        id_list (dict): List of ids
+        cor_list (np.ndarray): List of inter-robot correlations
+        cor_num (int): length of list 
+    Returns:
+        inno (np.ndarray): Innovation
+        K (np.ndarray): Kalman gain vector
+        H (np.ndarray):
+        cor_num (int): length of list
     """
-    pass
+    # First, check if we have made a measurement to this robot before:
+    if idj not in id_list.keys():
+        print("Adding new robot: " + str(idj))
+        idx = cor_num
+        id_list[idj] = idx
+        cor_num += 1 # TODO: No limit on growt, but np array has a max! Add limit check here
+        Pij = np.zeros((STATE_LEN, STATE_LEN))
+    else: 
+        idx = id_list[idj]
+        Pij = cor_list[:,:,idx] @ sigmaji.T
+    # Put together Paa matrix:
+    Pii = measi.P
+    Paa = np.zeros((STATE_LEN*2, STATE_LEN*2))
+    Paa[:STATE_LEN, :STATE_LEN] = Pii
+    Paa[:STATE_LEN, STATE_LEN:] = Pij
+    Paa[STATE_LEN:, :STATE_LEN] = Pij.T
+    Paa[:STATE_LEN, :STATE_LEN] = Pjj    
+    # Get Ha matrix:
+    Ha = measi.get_jacobian_rb_ext(moti.x, xj, tj)
+    # Get the argumented state vector
+    xa = np.append(moti.x, xj, axis=0)
+    # calculate 
+    ypred = measi.h_rb(moti.x, xj, tj)
+    R = measi.R
+    rad_sel = measi.radian_sel
+    xnew, Pnew, inno, K = _KF(xa, Paa, Ha, R, y, ypred, rad_sel)
+    # Now, split up the results:
+    moti.x = xnew[:STATE_LEN, 0:1]
+    xj_new = xnew[STATE_LEN:, 0:1]
+    Pii_new = Pnew[:STATE_LEN, :STATE_LEN]
+    Pjj_new = Pnew[STATE_LEN:, STATE_LEN:]
+    Pij_new = Pnew[STATE_LEN:, :STATE_LEN]
+    moti.P = Pii_new
+    cor_list[idx] = Pij_new # update the ij correlation
+    # Finally, approximate inter-robot correlations
+    luft_relative(Pii_new, Pii, idj, id_list, cor_list, cor_num)
+    
+    # xj_new and Pjj_new should be transmitted to the other robot
+    return xj_new, Pjj_new, inno, K 
+
+def recieve_meas(moti: MotionModel,
+                idj: int,
+                xi_new: np.ndarray,
+                Pii_new: np.ndarray,
+                id_list: dict,
+                cor_list: np.ndarray,
+                cor_num: int):
+    """
+    Function for the robot on the recieving end of an measurement
+    """
+    Pii = moti.P
+    moti.x = xi_new
+    moti.P = Pii_new
+    if idj not in id_list.keys():
+        print("Adding new robot: " + str(idj))
+        idx = cor_num
+        id_list[idj] = idx
+        cor_num += 1 # TODO: No limit on growt, but np array has a max! Add limit check here
+    else: 
+        idx = id_list[idj]
+    cor_list[:,:,idx] = np.eye(STATE_LEN) # This is due to the chosen decomposition of the correlation
+    # Then approximate all inter-robot correlations:
+    luft_relative(Pii_new, Pii, idj, id_list, cor_list, cor_num)
+
+    return # robot should not send anything back at this point
 
 
 #### Fake measurements ####
