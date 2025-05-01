@@ -122,6 +122,7 @@ class Robot_single:
     def robot_meas(self, r: 'Robot_single', ax = None, sr=0, sb=0):
         """
         Implements naive localization - does not take correlations into account.
+        But updates xi, xj, Pii and Pjj
         """
         # Get ambigious measurement
         ys = traj.gen_rb_amb(self.path[0,self.p_i], 
@@ -205,7 +206,7 @@ class robot_luft(Robot_single):
                            sr=sr,
                            sb=sb)
         
-        inno, _, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num)
+        inno, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
         # Log updated quantities:        
@@ -229,8 +230,8 @@ class robot_luft(Robot_single):
         # Request quantities from other robot:
         xj, Pjj, sigmaji, idj, tj = r.send_requested(self.id)
         # KF update
-        xj_new, Pjj_new, cor_num, inno, _ = mf.KF_relative_luft(self.moti, 
-                                                                self.measi, 
+        xj_new, Pjj_new, cor_num, inno, _ = mf.KF_relative_luft(self.mot, 
+                                                                self.meas, 
                                                                 idj, 
                                                                 xj,
                                                                 Pjj,
@@ -250,6 +251,18 @@ class robot_luft(Robot_single):
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
         return inno
+
+    def robot_meas_rom(self, raa: 'robot_luft', rbb: list, ax = None, sr=0, sb=0):
+        """
+        Function that implements Rom's decentralized CL.
+        Args:
+            raa (robot_luft): The other robot participating in the exchange
+            rbb (list): List of robots not participating in the exchange
+            ax (Axes): plot measurmenet 
+            sr (float): noise on range
+            sb (float): noise on bearing
+        """
+        pass
 
     def recieve_update(self, xnew, Pnew, idj):
         """

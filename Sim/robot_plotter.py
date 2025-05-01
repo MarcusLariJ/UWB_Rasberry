@@ -4,14 +4,17 @@ import matplotlib.patches as patch
 import numpy as np
 from scipy.stats.distributions import chi2
 
-def setup_plot() -> tuple[plt.Figure, plt.Axes]:
-    fig, ax = plt.subplots(figsize=(7, 7))
+def setup_plot(x=[0, 10], y=[0,7], figsize=(10,7)) -> tuple[plt.Figure, plt.Axes]:
+    fig, ax = plt.subplots(figsize=figsize)
     ax.set_title("Robot trajectory")
     ax.set_xlabel("x [m]")
     ax.set_ylabel("y [m]")
-    ax.set_xlim((-15,15))
-    ax.set_ylim((-15,15))
+    ax.set_xlim((x[0],x[1]))
+    ax.set_ylim((y[0],y[1]))
     ax.grid()
+    ax.tick_params(direction='in')
+    ax.set_xticks(np.arange(x[0], x[1]+1, 1))
+    ax.set_yticks(np.arange(y[0]+1, y[1]+1, 1))
 
     return fig, ax
 
@@ -51,7 +54,7 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b'):
         ax (plt.Axes): The ax of the main figure
         x (np.ndarray): The state to plot (given as theta, px, py)
     """
-    d = 2
+    d = 0.25
     len = x.shape[1]
     theta = x[0,:]
     px = x[1,:]
@@ -60,7 +63,7 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b'):
     ax.plot(px, py, color=color)
     ax.scatter(px, py, c=color, s=1.5)
     for i in range(len):
-        ax.arrow(px[i], py[i], d*np.cos(theta[i]), d*np.sin(theta[i]), color=color)
+        ax.arrow(px[i], py[i], d*np.cos(theta[i]), d*np.sin(theta[i]), color=color, head_width=0.05, length_includes_head=True)
     return 
 
 def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b'):
@@ -72,10 +75,11 @@ def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b'):
         x (np.ndarray): The state to plot 
         P (np.ndarray): The covariance to plot
     """
-    pos = x[X_P, 0]
-    Pxy = P[X_P, X_P]
-    plot_position(ax, np.concatenate((x[X_THETA:X_THETA+1], x[X_P]),axis=0), color)
-    plot_variance_ellipse(ax, Pxy, pos, color=color)
+    pos = x[X_P, :]
+    Pxy = P[X_P, X_P, :]
+    plot_position(ax, np.concatenate((x[X_THETA:X_THETA+1,:], x[X_P,:]),axis=0), color)
+    for i in range(P.shape[2]):
+        plot_variance_ellipse(ax, Pxy[:,:,i], pos[:,i], color=color)
 
 def plot_measurement(ax: plt.Axes, xi: np.ndarray, xj: np.ndarray):
     """
@@ -88,7 +92,7 @@ def plot_measurement(ax: plt.Axes, xi: np.ndarray, xj: np.ndarray):
     p1 = xi[X_P,0]
     p2 = xj[X_P,0]
     d = p2 - p1
-    ax.arrow(p1[0], p1[1], d[0], d[1], linestyle=':')
+    ax.arrow(p1[0], p1[1], d[0], d[1], linestyle=':',head_width=0.1, length_includes_head=True)
 
 def plot_measurement2(ax: plt.Axes, x: np.ndarray, r: float, phi: float):
     """
@@ -103,7 +107,7 @@ def plot_measurement2(ax: plt.Axes, x: np.ndarray, r: float, phi: float):
     p = x[X_P,0]
     d1 = np.cos(phi)*r
     d2 = np.sin(phi)*r 
-    ax.arrow(p[0], p[1], d1, d2, linestyle=':')
+    ax.arrow(p[0], p[1], d1, d2, linestyle=':',head_width=0.1, length_includes_head=True)
 
 def plot_innovation(ax: plt.Axes, inno: np.ndarray, var: float, dt=1, color='blue'):
     """

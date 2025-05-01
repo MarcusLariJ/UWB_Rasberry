@@ -569,11 +569,13 @@ def KF_rb_ext(moti: MotionModel,
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
     ypred = measi.h_rb(xi, xj, tj)
     radian_sel = measi.radian_sel[:Z_W]
-    # Pad the x state with zeros, so dimensions fit:
-    x = np.pad(xi, ((0, STATE_LEN), (0, 0)), mode='constant') 
+    # Append both state vectors to get x:
+    x = np.append(xi, xj, axis=0)
     xnew, Pnew, inno, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel)
-    moti.x = xnew[:STATE_LEN,:] #Only update state xi
-    moti.P = Pnew[:STATE_LEN, :STATE_LEN] #Only update Pii
+    moti.x = xnew[:STATE_LEN,:] # Update xi
+    motj.x = xnew[STATE_LEN:,:] # Update xj
+    moti.P = Pnew[:STATE_LEN, :STATE_LEN] # Update Pii
+    motj.P = Pnew[STATE_LEN:,STATE_LEN:] # Update Pjj
 
     return inno, K, H
 
@@ -622,14 +624,13 @@ def rom_private(K: np.ndarray, H: np.ndarray, cor: np.ndarray, cor_len: int):
         cor_len (int): number of inter-robot correlations
     """
     for i in range(cor_len):
-        cor[:,:,i] = (np.eye(K.shape[0]) - K @ H) @ cor[:,:,i]
+        cor[:,:,i] = (np.eye(cor.shape[0]) - K @ H) @ cor[:,:,i]
 
 def luft_relative(Pii_new: np.ndarray, 
                   Pii_old: np.ndarray, 
                   other_id: int,
-                  id_list: np.ndarray,
-                  cor: np.ndarray, 
-                  cor_len: int):
+                  id_list: dict,
+                  cor: np.ndarray):
     """
     Function for updating all inter-robot correlations when a private measurement is made, 
     between participating and non-participating robots (sigma_ik).
@@ -642,11 +643,13 @@ def luft_relative(Pii_new: np.ndarray,
         cor (np.ndarray): array of inter-robot correlations
         cor_len (int): number of inter-robot correlations
     """
+    # NOTE: P has to be populated before it can be inverted. Dont run a relative measurement before this has happened!
     P_approx = Pii_new @ np.linalg.inv(Pii_old)
-    for i in range(cor_len):
+    for i in id_list:
         # make sure to ignore the ID of the participating robot:
-        if not id_list[i] == other_id:
-            cor[:,:,i] = P_approx @ cor[:,:,i]
+        if not i == other_id:
+            idx = id_list[i]
+            cor[:,:,idx] = P_approx @ cor[:,:,idx]
 
 def KF_IMU_rom(mot: MotionModel, 
                meas: MeasModel, 
@@ -700,6 +703,53 @@ def KF_rb_rom(moti: MotionModel,
 
     return inno, K
 
+def _KF_relative_decen(moti: MotionModel,  
+            measi: MeasModel,
+            idj: int,
+            xj: np.ndarray,
+            Pjj: np.ndarray,
+            sigmaji: np.ndarray,
+            tj: np.ndarray,
+            ys: np.ndarray,
+            id_list: dict,
+            cor_list: np.ndarray,
+            cor_num: int):
+    # First, check if we have made a measurement to this robot before:
+    if idj not in id_list.keys():
+        print("Adding new robot: " + str(idj))
+        idx = cor_num
+        id_list[idj] = idx
+        cor_num += 1 # TODO: No limit on growt, but np array has a max! Add limit check here
+        Pij = np.zeros((STATE_LEN, STATE_LEN))
+    else: 
+        idx = id_list[idj]
+        Pij = cor_list[:,:,idx] @ sigmaji.T
+    # Put together Paa matrix:
+    Pii = moti.P
+    Paa = np.zeros((STATE_LEN*2, STATE_LEN*2))
+    Paa[:STATE_LEN, :STATE_LEN] = Pii
+    Paa[:STATE_LEN, STATE_LEN:] = Pij
+    Paa[STATE_LEN:, :STATE_LEN] = Pij.T
+    Paa[STATE_LEN:, STATE_LEN:] = Pjj    
+    # Get Ha matrix:
+    Ha = measi.get_jacobian_rb_ext(moti.x, xj, tj)
+    # Get the argumented state vector
+    xa = np.append(moti.x, xj, axis=0)
+    # calculate 
+    ypred = measi.h_rb(moti.x, xj, tj)
+    R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing
+    rad_sel = measi.radian_sel[:Z_W]
+    xnew, Pnew, inno, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel)
+    # Now, split up the results:
+    moti.x = xnew[:STATE_LEN, 0:1]
+    xj_new = xnew[STATE_LEN:, 0:1]
+    Pii_new = Pnew[:STATE_LEN, :STATE_LEN]
+    Pjj_new = Pnew[STATE_LEN:, STATE_LEN:]
+    Pij_new = Pnew[:STATE_LEN, STATE_LEN:]
+    moti.P = Pii_new
+    cor_list[:,:,idx] = Pij_new # update the ij correlation
+    return xj_new, Pii_new, Pii, Pjj_new, cor_num, inno, K
+
 def KF_relative_luft(moti: MotionModel,  
             measi: MeasModel,
             idj: int,
@@ -712,7 +762,7 @@ def KF_relative_luft(moti: MotionModel,
             cor_list: np.ndarray,
             cor_num: int):
     """
-    The big scary function!
+    Luft et als algorithm, that approximates inter-robot correlations for non-participating robots
     Args:
         moti (MotionModel): Motion model of the ego robot i 
         measi (MeasModel): Measurement model of the robot i
@@ -731,45 +781,39 @@ def KF_relative_luft(moti: MotionModel,
         inno (np.ndarray): Innovation
         K (np.ndarray): Kalman gain vector
     """
-    # First, check if we have made a measurement to this robot before:
-    if idj not in id_list.keys():
-        print("Adding new robot: " + str(idj))
-        idx = cor_num
-        id_list[idj] = idx
-        cor_num += 1 # TODO: No limit on growt, but np array has a max! Add limit check here
-        Pij = np.zeros((STATE_LEN, STATE_LEN))
-    else: 
-        idx = id_list[idj]
-        Pij = cor_list[:,:,idx] @ sigmaji.T
-    # Put together Paa matrix:
-    Pii = measi.P
-    Paa = np.zeros((STATE_LEN*2, STATE_LEN*2))
-    Paa[:STATE_LEN, :STATE_LEN] = Pii
-    Paa[:STATE_LEN, STATE_LEN:] = Pij
-    Paa[STATE_LEN:, :STATE_LEN] = Pij.T
-    Paa[:STATE_LEN, :STATE_LEN] = Pjj    
-    # Get Ha matrix:
-    Ha = measi.get_jacobian_rb_ext(moti.x, xj, tj)
-    # Get the argumented state vector
-    xa = np.append(moti.x, xj, axis=0)
-    # calculate 
-    ypred = measi.h_rb(moti.x, xj, tj)
-    R = measi.R
-    rad_sel = measi.radian_sel
-    xnew, Pnew, inno, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel)
-    # Now, split up the results:
-    moti.x = xnew[:STATE_LEN, 0:1]
-    xj_new = xnew[STATE_LEN:, 0:1]
-    Pii_new = Pnew[:STATE_LEN, :STATE_LEN]
-    Pjj_new = Pnew[STATE_LEN:, STATE_LEN:]
-    Pij_new = Pnew[STATE_LEN:, :STATE_LEN]
-    moti.P = Pii_new
-    cor_list[idx] = Pij_new # update the ij correlation
+    # first, perform the first part of the algorithm:
+    xj_new, Pii_new, Pii, Pjj_new, cor_num, inno, K = _KF_relative_decen(moti, 
+                                                                        measi, 
+                                                                        idj, 
+                                                                        xj, 
+                                                                        Pjj, 
+                                                                        sigmaji, 
+                                                                        tj, 
+                                                                        ys, 
+                                                                        id_list, 
+                                                                        cor_list, 
+                                                                        cor_num)
     # Finally, approximate inter-robot correlations
-    luft_relative(Pii_new, Pii, idj, id_list, cor_list, cor_num)
-    
+    luft_relative(Pii_new, Pii, idj, id_list, cor_list)
+    #TODO: check if id_list and cor_list gets updated correctly
     # xj_new and Pjj_new should be transmitted to the other robot
     return xj_new, Pjj_new, cor_num, inno, K 
+
+def KF_relative_rom(moti: MotionModel,  
+            measi: MeasModel,
+            idj: int,
+            xj: np.ndarray,
+            Pjj: np.ndarray,
+            sigmaji: np.ndarray,
+            tj: np.ndarray,
+            ys: np.ndarray,
+            id_list: dict,
+            cor_list: np.ndarray,
+            cor_num: int):
+    """
+    Roumeliotis et als algorithm, that uses the exact inter-robot correlations
+    """
+    pass
 
 def recieve_meas(moti: MotionModel,
                 idj: int,
@@ -790,7 +834,7 @@ def recieve_meas(moti: MotionModel,
         idx = id_list[idj]
     cor_list[:,:,idx] = np.eye(STATE_LEN) # This is due to the chosen decomposition of the correlation
     # Then approximate all inter-robot correlations:
-    luft_relative(Pii_new, Pii, idj, id_list, cor_list, cor_num)
+    luft_relative(Pii_new, Pii, idj, id_list, cor_list)
 
     return # robot should not send anything back at this point
 
