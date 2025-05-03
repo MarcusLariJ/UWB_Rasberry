@@ -126,9 +126,9 @@ class Robot_single:
         """
         # Get ambigious measurement
         ys = traj.gen_rb_amb(self.path[0,self.p_i], 
-                           r.x[mf.X_THETA, 0], 
+                           r.path[0,r.p_i], 
                            self.path[1:3, self.p_i:self.p_i+1], 
-                           r.x[mf.X_P],
+                           r.path[1:3, r.p_i:r.p_i+1],
                            self.t,
                            r.t,
                            sr=sr,
@@ -220,9 +220,9 @@ class robot_luft(Robot_single):
         """
         # Get ambigious measurement
         ys = traj.gen_rb_amb(self.path[0,self.p_i], 
-                           r.x[mf.X_THETA, 0], 
+                           r.path[0,r.p_i], 
                            self.path[1:3, self.p_i:self.p_i+1], 
-                           r.x[mf.X_P],
+                           r.path[1:3, r.p_i:r.p_i+1],
                            self.t,
                            r.t,
                            sr=sr,

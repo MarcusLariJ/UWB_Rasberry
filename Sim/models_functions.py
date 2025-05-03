@@ -644,12 +644,16 @@ def luft_relative(Pii_new: np.ndarray,
         cor_len (int): number of inter-robot correlations
     """
     # NOTE: P has to be populated before it can be inverted. Dont run a relative measurement before this has happened!
-    P_approx = Pii_new @ np.linalg.inv(Pii_old)
-    for i in id_list:
-        # make sure to ignore the ID of the participating robot:
-        if not i == other_id:
-            idx = id_list[i]
-            cor[:,:,idx] = P_approx @ cor[:,:,idx]
+    if len(id_list) > 1:
+        # If there is more than 1 entry in the correlation list, 
+        # that most mean there are non-participating robots in this measurement
+        P_approx = Pii_new @ np.linalg.inv(Pii_old)
+        for i in id_list:
+            # make sure to ignore the ID of the participating robot:
+            if not i == other_id:
+                idx = id_list[i]
+                cor[:,:,idx] = P_approx @ cor[:,:,idx]
+    return
 
 def KF_IMU_rom(mot: MotionModel, 
                meas: MeasModel, 
@@ -724,6 +728,8 @@ def _KF_relative_decen(moti: MotionModel,
     else: 
         idx = id_list[idj]
         Pij = cor_list[:,:,idx] @ sigmaji.T
+    # DEBUG:
+    Pij = np.zeros((STATE_LEN, STATE_LEN)) # always set to zero, to see if correlations cause problems
     # Put together Paa matrix:
     Pii = moti.P
     Paa = np.zeros((STATE_LEN*2, STATE_LEN*2))
