@@ -729,7 +729,7 @@ def _KF_relative_decen(moti: MotionModel,
         idx = id_list[idj]
         Pij = cor_list[:,:,idx] @ sigmaji.T
     # DEBUG:
-    Pij = np.zeros((STATE_LEN, STATE_LEN)) # always set to zero, to see if correlations cause problems
+    #Pij = np.zeros((STATE_LEN, STATE_LEN)) # DEBUG: always set to zero, to see if correlations cause problems
     # Put together Paa matrix:
     Pii = moti.P
     Paa = np.zeros((STATE_LEN*2, STATE_LEN*2))
@@ -746,6 +746,7 @@ def _KF_relative_decen(moti: MotionModel,
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing
     rad_sel = measi.radian_sel[:Z_W]
     xnew, Pnew, inno, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel)
+    print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
     # Now, split up the results:
     moti.x = xnew[:STATE_LEN, 0:1]
     xj_new = xnew[STATE_LEN:, 0:1]

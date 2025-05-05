@@ -179,7 +179,7 @@ class robot_luft(Robot_single):
             self.mot.predict()
             self.mot.propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
             if imu_correct:
-                inno, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1])
+                inno, _= mf.KF_IMU_rom(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num)
 
             self.p_i += 1 
 
