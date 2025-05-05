@@ -448,8 +448,9 @@ def _KF(x: np.ndarray,
     K = P @ np.transpose(H) @ np.linalg.inv(Q)
     # Update state estimate
     xnew = x + K @ inno 
-    # Update covariance
-    Pnew = (np.eye(P.shape[0]) - K @ H) @ P
+    # Update covariance (with Joseph form):
+    IKC = (np.eye(P.shape[0]) - K @ H)
+    Pnew = IKC @ P @ IKC.T + K @ R @ K.T
     # Return new values:
     return xnew, Pnew, inno, K
 
@@ -480,8 +481,9 @@ def _KF_ml(x: np.ndarray,
     K = P @ np.transpose(H) @ np.linalg.inv(S)
     # Update state estimate
     xnew = x + K @ inno 
-    # Update covariance
-    Pnew = (np.eye(P.shape[0]) - K @ H) @ P
+    # Update covariance (with Joseph form):
+    IKC = (np.eye(P.shape[0]) - K @ H)
+    Pnew = IKC @ P @ IKC.T + K @ R @ K.T
     # Return new values:
     return xnew, Pnew, inno, K
 
@@ -737,6 +739,8 @@ def _KF_relative_decen(moti: MotionModel,
     Paa[:STATE_LEN, STATE_LEN:] = Pij
     Paa[STATE_LEN:, :STATE_LEN] = Pij.T
     Paa[STATE_LEN:, STATE_LEN:] = Pjj    
+    # Ensure that Paa is PD: (maybe this is only needed on Pii/Pjj)
+    Paa = 1/2*(Paa + Paa.T)
     # Get Ha matrix:
     Ha = measi.get_jacobian_rb_ext(moti.x, xj, tj)
     # Get the argumented state vector
