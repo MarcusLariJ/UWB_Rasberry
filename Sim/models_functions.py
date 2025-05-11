@@ -750,7 +750,7 @@ def _KF_relative_decen(moti: MotionModel,
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing
     rad_sel = measi.radian_sel[:Z_W]
     xnew, Pnew, inno, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel)
-    print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
+    #print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
     # Now, split up the results:
     moti.x = xnew[:STATE_LEN, 0:1]
     xj_new = xnew[STATE_LEN:, 0:1]
@@ -994,7 +994,7 @@ def ML_rb_gen(ys,
         return ys, ml
     # Otherwise carry on
     i_final = -1
-    ml = 0
+    ml = -1
     for i in range(ylen):
         inno = subtractState(ys[:,i:i+1], zpred, rad_sel)
         # Calculate likelihood
@@ -1003,6 +1003,11 @@ def ML_rb_gen(ys,
         if p > ml:
             ml = p
             i_final = i
+    # Debug: Notify us when wrong measurement is used:
+    if not i_final == 0:
+        print("Wrong measurement used!! Bearing: " + str(ys[0,i_final]) + " was used instead of: " + str(ys[0,0]))
+    if ml == 0.0:
+        print("Zero! how?")
     # Use the most likely bearing for final measurement
     z = ys[:,i_final:i_final+1]
 

@@ -157,6 +157,24 @@ def gen_poly_traj(  x0: np.ndarray,
 
     return trajectory, IMU_meas
 
+def gen_poly_traj_multi(pos: list, time: list, dt):
+    """
+    Generate multiple trajectories and concatenate them
+    """
+    trajs = []
+    imu = []
+    for i in range(len(pos)-1):
+        temptraj, tempimu = gen_poly_traj(pos[i], pos[i+1], t0=time[i], tf=time[i+1], dt=dt)
+        trajs += [temptraj]
+        imu += [tempimu]
+    # Now concatenate everything:
+    trajectory = trajs[0]
+    IMU_meas = imu[0]
+    for i in range(len(imu)-1):
+        trajectory = np.append(trajectory[:,:-1], trajs[i+1], axis=1) # Remember to remove repeated position!!
+        IMU_meas = np.append(IMU_meas[:,:-1], imu[i+1], axis=1)
+    return trajectory, IMU_meas
+
 def gen_noise(y: np.ndarray, bias: np.ndarray = None, sigma: np.ndarray = None, dt: float = 1.0):
     """
     Applies noise to the passed measurement
