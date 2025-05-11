@@ -3,3 +3,4 @@ Sim/__pycache__/robot_plotter.cpython-310.pyc
 Sim/__pycache__/traj.cpython-310.pyc
 *.pyc
 API/output*
+API/log.csv
