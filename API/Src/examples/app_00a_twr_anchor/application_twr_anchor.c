@@ -51,6 +51,7 @@ twr_final_frame_t final_frame = {
 		0x23,				/* Function code: 0x22 ranging final with embedded timestamp */
 		{ 0, 0, 0, 0, 0 },	/* Time from TX of poll to RX of response frame (i.e. Tround1) */
 		{ 0, 0, 0, 0, 0 },	/* Time from RX of response to TX of final frame (i.e. Treply2) */
+		0,					/* PDoA measured by the anchor (pdoa_tx) */
 		/* According to ISO/IEC 24730-62:2013 the thre timestamps at the end should be only 32-bits each
 		 * but then we would just discard values and loose accuracy. */
 };
@@ -273,6 +274,8 @@ int application_twr_anchor(void)
 				final_frame.resp_final_reply_time[1] = (uint8_t)(Treply2 >> 8);
 				final_frame.resp_final_reply_time[2] = (uint8_t)(Treply2 >> 16);
 				final_frame.resp_final_reply_time[3] = (uint8_t)(Treply2 >> 32);
+
+				final_frame.pdoa_tx = pdoa_tx;
 
 				dwt_writetxdata(sizeof(final_frame), (uint8_t *)&final_frame, 0);
 				dwt_writetxfctrl(sizeof(final_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */

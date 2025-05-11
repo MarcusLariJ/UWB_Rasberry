@@ -68,6 +68,7 @@ uint64_t rx_timestamp_poll = 0;
 uint64_t tx_timestamp_response = 0;
 uint64_t rx_timestamp_final = 0;
 int16_t pdoa_rx = 0;
+int16_t pdoa_tx = 0;
 uint8_t tdoa_rx[5];
 
 uint8_t next_sequence_number = 0;
@@ -88,7 +89,7 @@ enum state_t state = TWR_SYNC_STATE;
 /* timeout before the ranging exchange will be abandoned and restarted */
 const static int ranging_timeout = 1000;
 
-void transmit_rx_diagnostics(float current_rotation, int16_t pdoa, uint8_t * tdoa);
+void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
 
 /**
  * Application entry point.
@@ -320,7 +321,6 @@ int application_twr_pdoa_tag(void)
 				current_rotation = getAngle(); // for debugging
 				pdoa_rx = dwt_readpdoa();
 				dwt_readtdoa(tdoa_rx); // the tdoa measurements are pretty much useless, since antennas are too close
-				transmit_rx_diagnostics(current_rotation, pdoa_rx, tdoa_rx); // log true rotation, measured pdoa and tdoa
 
 				/* Accept frame continue with ranging */
 				next_sequence_number++;
@@ -344,8 +344,11 @@ int application_twr_pdoa_tag(void)
 				const float tprop_ns = ((double)subtraction) / (denominator << 6);
 				const uint32_t dist_mm = (uint32_t)(tprop_ns*299.792458);  // usint c = 299.7... mm/ns
 
+				pdoa_tx = rx_final_frame_pointer->pdoa_tx;
+
 				// Write to log CSV file
 				csv_write_twr(Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
+				transmit_rx_diagnostics(current_rotation, pdoa_rx, pdoa_tx, tdoa_rx); // log true rotation, measured pdoa and tdoa
 
 				/* Transmit human readable for debugging */
 				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_m: %.2f\n", twr_count, ((float)dist_mm)/1000);
@@ -423,14 +426,15 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data)
 	dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-void transmit_rx_diagnostics(float current_rotation, int16_t pdoa, uint8_t * tdoa) {
+void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa) {
 	// Readable pdoa stuff
-	float pdoa_read = ((float)pdoa / (1 << 11));
+	float pdoa_read_rx = ((float)pdoa_rx / (1 << 11));
+	float pdoa_read_tx = ((float)pdoa_tx / (1 << 11));
 
 	// angle
 	float eq_lamb = 4.6196;
 	float eq_d = 2.31;
-	float eq_aoa = asinf((pdoa_read*eq_lamb)/(2*M_PI*eq_d)) * (180/M_PI);
+	float eq_aoa = asinf((pdoa_read_rx*eq_lamb)/(2*M_PI*eq_d)) * (180/M_PI);
 
 	// Readabe tdoa stuff
 	int64_t tdoa_read = ((uint64_t)tdoa[0]) \
@@ -443,10 +447,10 @@ void transmit_rx_diagnostics(float current_rotation, int16_t pdoa, uint8_t * tdo
 		tdoa_read = tdoa_read | 0xffffff0000000000;
 	}
 
-	snprintf(print_buffer, sizeof(print_buffer), "raw pdoa: %.6f, tdoa: %ld, aoa: %.6f, True angle: %.1f \n",  pdoa_read, tdoa_read, eq_aoa, current_rotation);
+	snprintf(print_buffer, sizeof(print_buffer), "raw pdoa rx: %.6f, raw pdoa tx: %.6f, tdoa: %ld, aoa: %.6f, True angle: %.1f \n",  pdoa_read_rx, pdoa_read_tx, tdoa_read, eq_aoa, current_rotation);
 	printf(print_buffer);
 
-	csv_write_rx(pdoa_read, tdoa_read, current_rotation);
+	csv_write_rx(pdoa_read_rx, tdoa_read, current_rotation);
 }
 
 #endif
