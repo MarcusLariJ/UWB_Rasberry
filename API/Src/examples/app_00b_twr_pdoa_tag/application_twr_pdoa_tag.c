@@ -62,11 +62,13 @@ twr_base_frame_t response_frame = {
 
 const static size_t max_frame_length = sizeof(twr_final_frame_t) + 2;
 
-const static uint64_t round_tx_delay = 700llu*US_TO_DWT_TIME;  // reply time (0.9ms)
+const static uint64_t round_tx_delay = 10000llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
 
 uint64_t rx_timestamp_poll = 0;
 uint64_t tx_timestamp_response = 0;
 uint64_t rx_timestamp_final = 0;
+int16_t pdoa_rx = 0;
+uint8_t tdoa_rx[5];
 
 uint8_t next_sequence_number = 0;
 
@@ -86,8 +88,7 @@ enum state_t state = TWR_SYNC_STATE;
 /* timeout before the ranging exchange will be abandoned and restarted */
 const static int ranging_timeout = 1000;
 
-void transmit_rx_diagnostics(float current_rotation);
-void transmit_cir();
+void transmit_rx_diagnostics(float current_rotation, int16_t pdoa, uint8_t * tdoa);
 
 /**
  * Application entry point.
@@ -155,9 +156,7 @@ int application_twr_pdoa_tag(void)
     uint32_t last_sync_time = millis(); // replaced HAL_GetTick();
 
     float current_rotation = 0;
-    int8_t rotation_direction = 1;
     uint16_t twr_count = 0;
-    uint8_t full_rotation_count = 0;
 
     /*Get unique chip ID from OTP memory as device identification*/
 	dwt_otpread(CHIPID_ADDR, &device_id, 1);
@@ -318,8 +317,10 @@ int application_twr_pdoa_tag(void)
 				printf(print_buffer);
 
 				/* Transmit measurement data */
-				current_rotation = getAngle();
-				transmit_rx_diagnostics(current_rotation);
+				current_rotation = getAngle(); // for debugging
+				pdoa_rx = dwt_readpdoa();
+				dwt_readtdoa(tdoa_rx); // the tdoa measurements are pretty much useless, since antennas are too close
+				transmit_rx_diagnostics(current_rotation, pdoa_rx, tdoa_rx); // log true rotation, measured pdoa and tdoa
 
 				/* Accept frame continue with ranging */
 				next_sequence_number++;
@@ -343,15 +344,13 @@ int application_twr_pdoa_tag(void)
 				const float tprop_ns = ((double)subtraction) / (denominator << 6);
 				const uint32_t dist_mm = (uint32_t)(tprop_ns*299.792458);  // usint c = 299.7... mm/ns
 
-				/* Transmit TWR round and reply times and ranging estimate */
-				//static_assert(sizeof(meas_twr_t) == 40);
-				//meas_twr_t raning_blob = { Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation };
+				// Write to log CSV file
 				csv_write_twr(Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
 
 				/* Transmit human readable for debugging */
-				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_mm: %.2f\n", twr_count, ((float)dist_mm)/1000);
+				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_m: %.2f\n", twr_count, ((float)dist_mm)/1000);
 				printf(print_buffer);
-				snprintf(print_buffer, sizeof(print_buffer), "rotation: %u, 360_count: %u\n", current_rotation, full_rotation_count);
+				snprintf(print_buffer, sizeof(print_buffer), "rotation: %u\n", current_rotation);
 				printf(print_buffer);
 
 				/* Rotate receiver */
@@ -424,69 +423,9 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data)
 	dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-void transmit_rx_diagnostics(float current_rotation) {
-	dwt_rxdiag_t rx_diag = {0};
-	dwt_readdiagnostics(&rx_diag);
-	/*
-	static_assert(sizeof(meas_time_poa_t) == 44);
-	stdio_write("BLOB / toa / v3 / 43\n");
-	meas_time_poa_t poa_time_blob;
-	poa_time_blob.cia_diag_1 = rx_diag.ciaDiag1;
-	poa_time_blob.ip_poa = rx_diag.ipatovPOA;
-	poa_time_blob.sts1_poa = rx_diag.stsPOA;
-	poa_time_blob.sts2_poa = rx_diag.sts2POA;
-	poa_time_blob.pdoa = rx_diag.pdoa;
-	poa_time_blob.xtal_offset = rx_diag.xtalOffset;
-	poa_time_blob.sts_qual = dwt_readstsquality(&poa_time_blob.sts_qual_index);
-	poa_time_blob.tdoa_sign = rx_diag.tdoa[5] & 0x01;
-	memcpy(poa_time_blob.tdoa, rx_diag.tdoa, 5);
-	memcpy(poa_time_blob.ip_toa, rx_diag.ipatovRxTime, 5);
-	poa_time_blob.ip_toast = rx_diag.ipatovRxStatus;
-	memcpy(poa_time_blob.sts1_toa, rx_diag.stsRxTime, 5);
-	// read manually (because of an error in the API) and discard the first bit which is reserved anyways
-	poa_time_blob.sts1_toast = dwt_read8bitoffsetreg(STS_TOA_HI_ID, 3);
-	memcpy(poa_time_blob.sts2_toa, rx_diag.sts2RxTime, 5);
-	// read manually (because of an error in the API) and discard the first bit which is reserved anyways
-	poa_time_blob.sts2_toast = dwt_read8bitoffsetreg(STS1_TOA_HI_ID, 3);
-	poa_time_blob.fp_th_md = (dwt_read16bitoffsetreg(0x0C001E, 0) & 0x4000) >> 14;
-	poa_time_blob.dgc_decision = (dwt_read8bitoffsetreg(0x030060, 3) & 0x70) >> 4;
-	stdio_write_binary((uint8_t*)&poa_time_blob, 43);  // no need to transmit the padding bytes
-	stdio_write("\n");
-
-	static_assert(sizeof(meas_cir_analysis_t) == 24);
-	meas_cir_analysis_t cir_analysis_blob;
-	stdio_write("BLOB / cir analysis ip / v1 / 24\n");
-	cir_analysis_blob.peak = rx_diag.ipatovPeak;
-	cir_analysis_blob.power = rx_diag.ipatovPower;
-	cir_analysis_blob.F1 = rx_diag.ipatovF1;
-	cir_analysis_blob.F2 = rx_diag.ipatovF2;
-	cir_analysis_blob.F3 = rx_diag.ipatovF3;
-	cir_analysis_blob.fp_index = rx_diag.ipatovFpIndex;
-	cir_analysis_blob.accum_count = rx_diag.ipatovAccumCount;
-	stdio_write_binary((uint8_t*)&cir_analysis_blob, 24);
-	stdio_write("\nBLOB / cir analysis sts1 / v1 / 24\n");
-	cir_analysis_blob.peak = rx_diag.stsPeak;
-	cir_analysis_blob.power = rx_diag.stsPower;
-	cir_analysis_blob.F1 = rx_diag.stsF1;
-	cir_analysis_blob.F2 = rx_diag.stsF2;
-	cir_analysis_blob.F3 = rx_diag.stsF3;
-	cir_analysis_blob.fp_index = rx_diag.stsFpIndex;
-	cir_analysis_blob.accum_count = rx_diag.stsAccumCount;
-	stdio_write_binary((uint8_t*)&cir_analysis_blob, 24);
-	stdio_write("\nBLOB / cir analysis sts2 / v1 / 24\n");
-	cir_analysis_blob.peak = rx_diag.sts2Peak;
-	cir_analysis_blob.power = rx_diag.sts2Power;
-	cir_analysis_blob.F1 = rx_diag.sts2F1;
-	cir_analysis_blob.F2 = rx_diag.sts2F2;
-	cir_analysis_blob.F3 = rx_diag.sts2F3;
-	cir_analysis_blob.fp_index = rx_diag.sts2FpIndex;
-	cir_analysis_blob.accum_count = rx_diag.sts2AccumCount;
-	stdio_write_binary((uint8_t*)&cir_analysis_blob, 24);
-	stdio_write("\n");
-	*/
-	
+void transmit_rx_diagnostics(float current_rotation, int16_t pdoa, uint8_t * tdoa) {
 	// Readable pdoa stuff
-	float pdoa_read = ((float)rx_diag.pdoa / (1 << 11));
+	float pdoa_read = ((float)pdoa / (1 << 11));
 
 	// angle
 	float eq_lamb = 4.6196;
@@ -494,12 +433,12 @@ void transmit_rx_diagnostics(float current_rotation) {
 	float eq_aoa = asinf((pdoa_read*eq_lamb)/(2*M_PI*eq_d)) * (180/M_PI);
 
 	// Readabe tdoa stuff
-	int64_t tdoa_read = ((uint64_t)rx_diag.tdoa[0]) \
-						+ ((uint64_t)rx_diag.tdoa[1] << 8) \
-						+ ((uint64_t)rx_diag.tdoa[2] << 16) \
-						+ ((uint64_t)rx_diag.tdoa[3] << 24) \
-						+ ((uint64_t)rx_diag.tdoa[4] << 32);
-	if (rx_diag.tdoa[5] & 0x01){
+	int64_t tdoa_read = ((uint64_t)tdoa[0]) \
+						+ ((uint64_t)tdoa[1] << 8) \
+						+ ((uint64_t)tdoa[2] << 16) \
+						+ ((uint64_t)tdoa[3] << 24) \
+						+ ((uint64_t)tdoa[4] << 32);
+	if (tdoa[5] & 0x01){
 		// negative signed number. Set all upper 24 bits to 1:
 		tdoa_read = tdoa_read | 0xffffff0000000000;
 	}
@@ -508,13 +447,6 @@ void transmit_rx_diagnostics(float current_rotation) {
 	printf(print_buffer);
 
 	csv_write_rx(pdoa_read, tdoa_read, current_rotation);
-}
-
-void transmit_cir() {
-	uint8_t cir_buffer[9216+1]; // reduced from 12288+1
-	dwt_readaccdata(cir_buffer, 9216+1, 0);
-	printf("BLOB / cir / v1 / 9216\n");
-	csv_write_CIR(cir_buffer, 9216+1, 1);
 }
 
 #endif
