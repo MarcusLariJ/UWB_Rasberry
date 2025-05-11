@@ -57,7 +57,7 @@ twr_final_frame_t final_frame = {
 
 const static size_t max_frame_length = sizeof(twr_final_frame_t) + 2;
 
-const static uint64_t round_tx_delay = 10llu*1000llu*US_TO_DWT_TIME;  // reply time (10ms)
+const static uint64_t round_tx_delay = 500llu*US_TO_DWT_TIME;  // reply time (0.5ms)
 
 uint64_t tx_timestamp_poll = 0;
 uint64_t rx_timestamp_response = 0;
