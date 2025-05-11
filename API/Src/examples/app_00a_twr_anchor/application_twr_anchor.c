@@ -62,6 +62,7 @@ const static uint64_t round_tx_delay = 700llu*US_TO_DWT_TIME;  // reply time (0.
 uint64_t tx_timestamp_poll = 0;
 uint64_t rx_timestamp_response = 0;
 uint64_t tx_timestamp_final = 0;
+int16_t pdoa_tx = 0;
 
 uint8_t next_sequence_number = 0;
 
@@ -243,6 +244,8 @@ int application_twr_anchor(void)
 				printf("RX: Response frame\n");
 				dwt_readrxtimestamp(timestamp_buffer);
 				rx_timestamp_response = decode_40bit_timestamp(timestamp_buffer);
+
+				pdoa_tx = dwt_readpdoa(); 
 
 				/* Accept frame and continue ranging */
 				next_sequence_number++;
