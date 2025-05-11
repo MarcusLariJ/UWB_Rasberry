@@ -62,7 +62,7 @@ twr_base_frame_t response_frame = {
 
 const static size_t max_frame_length = sizeof(twr_final_frame_t) + 2;
 
-const static uint64_t round_tx_delay = 700llu*US_TO_DWT_TIME;  // reply time (10ms)
+const static uint64_t round_tx_delay = 900llu*US_TO_DWT_TIME;  // reply time (0.9ms)
 
 //#define ROTATE  /* Define to rotate the receiver */
 #ifdef ROTATE
@@ -172,13 +172,6 @@ int application_twr_pdoa_tag(void)
 	printf("Wait 3s before starting...");
     Sleep(3000);
 
-#ifdef ROTATE
-	snprintf(print_buffer, sizeof(print_buffer), "Config: twr/angle: %u\n", TWR_COUNT_PER_ANGLE);
-#else
-	snprintf(print_buffer, sizeof(print_buffer), "Config: twr/angle: -\n");
-#endif
-	printf(print_buffer);
-
 	while (1)
 	{
 		/* check timeout and restart ranging if necessary (if there is an overflow in the tick counter the difference
@@ -250,7 +243,7 @@ int application_twr_pdoa_tag(void)
 					continue;
 				}
 
-				//printf("RX: Poll frame\n");
+				printf("RX: Poll frame\n");
 
 				dwt_readrxtimestamp(timestamp_buffer);
 				rx_timestamp_poll = decode_40bit_timestamp(timestamp_buffer);

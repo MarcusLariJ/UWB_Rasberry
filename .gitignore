@@ -4,3 +4,4 @@ Sim/__pycache__/traj.cpython-310.pyc
 *.pyc
 API/output*
 API/log.csv
+API/log.csv
