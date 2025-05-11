@@ -62,13 +62,7 @@ twr_base_frame_t response_frame = {
 
 const static size_t max_frame_length = sizeof(twr_final_frame_t) + 2;
 
-const static uint64_t round_tx_delay = 900llu*US_TO_DWT_TIME;  // reply time (0.9ms)
-
-//#define ROTATE  /* Define to rotate the receiver */
-#ifdef ROTATE
-#define TWR_COUNT_PER_ANGLE 5
-#define ROTATION_WRAP 1  /* Define to rotate continuously and not to 360 and back */
-#endif
+const static uint64_t round_tx_delay = 700llu*US_TO_DWT_TIME;  // reply time (0.9ms)
 
 uint64_t rx_timestamp_poll = 0;
 uint64_t tx_timestamp_response = 0;
@@ -326,7 +320,6 @@ int application_twr_pdoa_tag(void)
 				/* Transmit measurement data */
 				current_rotation = getAngle();
 				transmit_rx_diagnostics(current_rotation);
-				//transmit_cir();
 
 				/* Accept frame continue with ranging */
 				next_sequence_number++;
@@ -351,11 +344,8 @@ int application_twr_pdoa_tag(void)
 				const uint32_t dist_mm = (uint32_t)(tprop_ns*299.792458);  // usint c = 299.7... mm/ns
 
 				/* Transmit TWR round and reply times and ranging estimate */
-				static_assert(sizeof(meas_twr_t) == 40);
-				printf("BLOB / twr / v2 / 40\n");
-				meas_twr_t raning_blob = { Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation };
-				//stdio_write_binary((uint8_t*)&raning_blob, 40);
-				//stdio_write("\n");
+				//static_assert(sizeof(meas_twr_t) == 40);
+				//meas_twr_t raning_blob = { Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation };
 				csv_write_twr(Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
 
 				/* Transmit human readable for debugging */
@@ -371,6 +361,9 @@ int application_twr_pdoa_tag(void)
 				tx_done = 0;
 				rx_done = 0;
 				state = TWR_SYNC_STATE;
+
+				// Short sleep, after succesful communication
+				//Sleep(200);
 			}
 			break;
 		case TWR_ERROR:
