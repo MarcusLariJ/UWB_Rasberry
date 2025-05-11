@@ -1,0 +1,77 @@
+{
+    "files.associations": {
+        "port.h": "c",
+        "pthread.h": "c",
+        "shared_functions.h": "c",
+        "example_selection.h": "c",
+        "application_config.h": "c"
+    },
+    "makefile.configureOnOpen": true,
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_03d_tx_wait_resp_interrupts",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_03d_tx_wait_resp_interrupts/test_tx_wait_resp_int",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/app_twr_anchor",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/app_00a_twr_anchor",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/app_00a_twr_anchor/app_twr_anchor",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/app_00b_twr_pdoa_tag",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/app_00b_twr_pdoa_tag/app_twr_pdoa",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_06a_ss_twr_initiator",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_06a_ss_twr_initiator/test_ss_twr_initiator",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_05b_ds_twr_resp",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_05b_ds_twr_resp/test_ds_twr_responder",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_02g_simple_rx_sts_sdc",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_02g_simple_rx_sts_sdc/test_simple_rx_sts_sdc",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_02h_simple_rx_pdoa",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_02h_simple_rx_pdoa/test_simple_rx_pdoa",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_03a_tx_wait_resp",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_03a_tx_wait_resp/test_tx_wait_resp",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_02a_simple_rx",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_02a_simple_rx/test_simple_rx",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_06b_ss_twr_responder",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_06b_ss_twr_responder/test_ss_twr_responder",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_00a_reading_dev_id",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_00a_reading_dev_id/test_reading_dev_id",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/kalliope/UWB_Rasberry/API/output/ex_01h_simple_tx_pdoa",
+            "binaryPath": "/home/kalliope/UWB_Rasberry/API/output/ex_01h_simple_tx_pdoa/test_simple_tx_pdoa",
+            "binaryArgs": []
+        }
+    ]
+}
