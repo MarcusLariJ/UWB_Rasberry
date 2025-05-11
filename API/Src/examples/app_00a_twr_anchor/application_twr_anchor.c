@@ -151,6 +151,8 @@ int application_twr_anchor(void)
     twr_base_frame_t *rx_frame_pointer;
     int16_t sts_quality_index;
 
+	uint8_t tag_ID[2] = { 'A', 'A' }; // set the ID of the tag
+
 	while (1)
 	{
 		switch (state) {
@@ -179,6 +181,12 @@ int application_twr_anchor(void)
 
 				if (rx_frame_pointer->twr_function_code != 0x20) {  /* ranging init */
 					printf("RX ERR: wrong frame (expected sync)\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				if (memcmp(tag_ID, rx_frame_pointer->dst_address, 2) != 0) {
+					printf("RX ERR: wrong dest address on sync frame\n");
 					state = TWR_ERROR;
 					continue;
 				}
@@ -238,6 +246,12 @@ int application_twr_anchor(void)
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
 					printf("RX ERR: wrong sequence number\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				if (memcmp(tag_ID, rx_frame_pointer->dst_address, 2) != 0) {
+					printf("RX ERR: wrong dest address on response frame\n");
 					state = TWR_ERROR;
 					continue;
 				}

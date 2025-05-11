@@ -162,6 +162,7 @@ int application_twr_pdoa_tag(void)
     /*Get unique chip ID from OTP memory as device identification*/
 	dwt_otpread(CHIPID_ADDR, &device_id, 1);
 	printf("Chip ID: %u\n", device_id);
+	uint8_t tag_ID[2] = { 'T', 'T' }; // set the ID of the tag
 
 	printf("Wait 3s before starting...");
     Sleep(3000);
@@ -237,6 +238,12 @@ int application_twr_pdoa_tag(void)
 					continue;
 				}
 
+				if (memcmp(tag_ID, rx_frame_pointer->dst_address, 2) != 0) {
+					printf("RX ERR: wrong dest address on poll frame\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
 				printf("RX: Poll frame\n");
 
 				dwt_readrxtimestamp(timestamp_buffer);
@@ -304,6 +311,12 @@ int application_twr_pdoa_tag(void)
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
 					printf("RX ERR: wrong sequence number\n");
+					state = TWR_ERROR;
+					continue;
+				}
+				
+				if (memcmp(tag_ID, rx_frame_pointer->dst_address, 2) != 0) {
+					printf("RX ERR: wrong dest address on final frame\n");
 					state = TWR_ERROR;
 					continue;
 				}
