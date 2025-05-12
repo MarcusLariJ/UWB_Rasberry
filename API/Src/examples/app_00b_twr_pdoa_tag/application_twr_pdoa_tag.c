@@ -33,6 +33,7 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data);
 volatile uint8_t rx_done = 0;  /* Flag to indicate a new frame was received from the interrupt */
 volatile uint16_t new_frame_length = 0;
 volatile uint8_t tx_done = 0;
+volatile uint32_t last_recieve_time;
 
 char print_buffer[128];
 
@@ -60,6 +61,29 @@ twr_base_frame_t response_frame = {
 		 * option code and parameters we skip this here fore simplicity. */
 };
 
+twr_base_frame_t poll_frame = {
+		{ 0x41, 0x88 },	/* Frame Control: data frame, short addresses */
+		0,				/* Sequence number */
+		{ 'X', 'X' },	/* PAN ID */
+		{ 'T', 'T' },	/* Destination address */
+		{ 'A', 'A' },	/* Source address */
+		0x21,			/* Function code: 0x21 ranging poll */
+};
+
+twr_final_frame_t final_frame = {
+		{ 0x41, 0x88 },		/* Frame Control: data frame, short addresses */
+		0,					/* Sequence number */
+		{ 'X', 'X' },		/* PAN ID */
+		{ 'T', 'T' },		/* Destination address */
+		{ 'A', 'A' },		/* Source address */
+		0x23,				/* Function code: 0x22 ranging final with embedded timestamp */
+		{ 0, 0, 0, 0, 0 },	/* Time from TX of poll to RX of response frame (i.e. Tround1) */
+		{ 0, 0, 0, 0, 0 },	/* Time from RX of response to TX of final frame (i.e. Treply2) */
+		0,					/* PDoA measured by the anchor (pdoa_tx) */
+		/* According to ISO/IEC 24730-62:2013 the thre timestamps at the end should be only 32-bits each
+		 * but then we would just discard values and loose accuracy. */
+};
+
 const static size_t max_frame_length = sizeof(twr_final_frame_t) + 2;
 
 const static uint64_t round_tx_delay = 10000llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
@@ -67,6 +91,10 @@ const static uint64_t round_tx_delay = 10000llu*US_TO_DWT_TIME;  // reply time (
 uint64_t rx_timestamp_poll = 0;
 uint64_t tx_timestamp_response = 0;
 uint64_t rx_timestamp_final = 0;
+uint64_t tx_timestamp_poll = 0;
+uint64_t rx_timestamp_response = 0;
+uint64_t tx_timestamp_final = 0;
+
 int16_t pdoa_rx = 0;
 int16_t pdoa_tx = 0;
 uint8_t tdoa_rx[5];
@@ -78,16 +106,21 @@ const uint16_t CHIPID_ADDR = 0x06;
 uint32_t device_id;
 
 enum state_t {
-	TWR_SYNC_STATE,
-	TWR_POLL_RESPONSE_STATE,
-	TWR_FINAL_STATE,
+	TWR_SYNC_STATE_TAG,
+	TWR_POLL_RESPONSE_STATE_TAG,
+	TWR_FINAL_STATE_TAG,
+	TWR_SYNC_STATE_ANC,
+	TWR_POLL_RESPONSE_STATE_ANC,
+	TWR_FINAL_STATE_ANC,
 	TWR_ERROR,
 };
 
-enum state_t state = TWR_SYNC_STATE;
+enum state_t state = TWR_SYNC_STATE_TAG;
+uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
 const static int ranging_timeout = 1000;
+const int attempt_transmit_timeout = 5; // 5 ms, more tha enough for a TWR exchange 
 
 void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
 
@@ -96,7 +129,8 @@ void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pd
  */
 int application_twr_pdoa_tag(void)
 {
-    stdio_init();
+    /*		------------------------------------------------- THE FRANKENCODE BEGINS -------------------------------------------------	 */
+	stdio_init();
 	printf("DW3000 TEST TWR Tag\n");
 
     /* Configure SPI rate, DW IC supports up to 38 MHz */
@@ -147,7 +181,7 @@ int application_twr_pdoa_tag(void)
     port_set_dwic_isr(dwt_isr);
 
     /* Enable IC diagnostic calculation and logging */
-    dwt_configciadiag(DW_CIA_DIAG_LOG_ALL);
+    dwt_configciadiag(DW_CIA_DIAG_LOG_ALL); //maybe delete this 
 
     uint8_t timestamp_buffer[5];
     uint8_t rx_buffer[max_frame_length];
@@ -155,6 +189,7 @@ int application_twr_pdoa_tag(void)
     twr_final_frame_t *rx_final_frame_pointer;
     int16_t sts_quality_index;
     uint32_t last_sync_time = millis(); // replaced HAL_GetTick();
+	last_recieve_time = millis();
 
     float current_rotation = 0;
     uint16_t twr_count = 0;
@@ -170,13 +205,12 @@ int application_twr_pdoa_tag(void)
 
 	while (1)
 	{
-		/* check timeout and restart ranging if necessary (if there is an overflow in the tick counter the difference
-		 * will overflow too and will trigger the timeout, but that shouldn't be much of an issue) */
-		if ((millis() - last_sync_time) > ranging_timeout) { 
-			dwt_forcetrxoff();  // make sure receiver is off after a timeout
-			last_sync_time = millis(); // replaced HAL_GetTick()
+		/* check ranging timeout and restart ranging if necessary  */
+		if (tag_mode && (millis() - last_sync_time) > ranging_timeout) { 
+			dwt_forcetrxoff();  // make sure receiver is off after a timeout (what to do about this??)
 			printf("Timeout -> reset\n");
-			state = TWR_SYNC_STATE;
+			tag_mode = 0;
+			state = TWR_SYNC_STATE_ANC; // if we timeout, go back to being an anchor (TODO: maybe stay an anchor?)
 			rx_timestamp_poll = 0;
 			tx_timestamp_response = 0;
 			rx_timestamp_final = 0;
@@ -185,7 +219,197 @@ int application_twr_pdoa_tag(void)
 		}
 
 		switch (state) {
-		case TWR_SYNC_STATE:
+		
+		/*		------------------------------------------------- ANCHOR CODE -------------------------------------------------	 */
+		
+		case TWR_SYNC_STATE_ANC:
+			/* Wait for sync frame (1/4) */
+			
+			/* If it is time to transmit: */
+			if (!tag_mode && (millis() - last_recieve_time) > attempt_transmit_timeout + ((float)rand()/RAND_MAX)*attempt_transmit_timeout) {
+				dwt_forcetrxoff();
+				last_sync_time = millis();
+				last_recieve_time = millis();
+				printf("Time to transmit!");
+				tag_mode = 1;
+				state = TWR_SYNC_STATE_TAG; // We become a tag
+				tx_timestamp_poll = 0;
+				rx_timestamp_response = 0;
+				tx_timestamp_final = 0;
+				tx_done = 0;
+				rx_done = 0;
+				rand();
+			}
+
+			if (rx_done)
+			{
+				rx_done = 0;
+
+				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
+					printf("RX ERR: wrong frame length\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				int sts_quality = dwt_readstsquality(&sts_quality_index);
+				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
+					printf("RX ERR: bad STS quality\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				dwt_readrxdata(rx_buffer, new_frame_length, 0);
+				/* We assume this is a TWR frame, but not necessarily the right one */
+				rx_frame_pointer = (twr_base_frame_t *)rx_buffer;
+
+				if (rx_frame_pointer->twr_function_code != 0x20) {  /* ranging init */
+					printf("RX ERR: wrong frame (expected sync)\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
+					printf("RX ERR: wrong dest address on sync frame\n");
+					// TODO: If we do not know this address, add it to list of addresses to try to transmit to
+					state = TWR_ERROR;
+					continue;
+				}
+
+				printf("RX: Sync frame\n");
+
+				/* Set the expected source to that of the incoming messages source, to ignore all other messages*/
+				your_ID[0] = rx_frame_pointer->src_address[0];
+				your_ID[1] = rx_frame_pointer->src_address[1];
+
+				/* Initialize the sequence number for this ranging exchange */
+				next_sequence_number = rx_frame_pointer->sequence_number + 1;
+
+				/* Send poll frame (2/4) */
+				state = TWR_POLL_RESPONSE_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
+				poll_frame.sequence_number = next_sequence_number++;
+				dwt_writetxdata(sizeof(poll_frame), (uint8_t *)&poll_frame, 0);
+				dwt_writetxfctrl(sizeof(poll_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
+				int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+				if (r != DWT_SUCCESS) {
+					printf("TX ERR: could not send poll frame\n");
+					state = TWR_ERROR;
+					continue;
+				}
+			}
+			break;
+		case TWR_POLL_RESPONSE_STATE_ANC:
+			if (tx_done == 1) {
+				tx_done = 2;
+				printf("TX: Poll frame\n");
+				dwt_readtxtimestamp(timestamp_buffer);
+				tx_timestamp_poll = decode_40bit_timestamp(timestamp_buffer);
+			}
+
+			/* Wait for response frame (3/4) */
+			if (rx_done == 1) {
+				rx_done = 0; /* reset */
+
+				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
+					printf("RX ERR: wrong frame length\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				int sts_quality = dwt_readstsquality(&sts_quality_index);
+				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
+					printf("RX ERR: bad STS quality\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				dwt_readrxdata(rx_buffer, new_frame_length, 0);
+				/* We assume this is a TWR frame, but not necessarily the right one */
+				rx_frame_pointer = (twr_base_frame_t *)rx_buffer;
+
+				if (rx_frame_pointer->twr_function_code != 0x10) { /* response */
+					printf("RX ERR: wrong frame (expected response)\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				if (rx_frame_pointer->sequence_number != next_sequence_number) {
+					printf("RX ERR: wrong sequence number\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
+					printf("RX ERR: wrong dest address on response frame\n");
+					state = TWR_ERROR;
+					continue;
+				}
+				
+				if (memcmp(your_ID, rx_frame_pointer->src_address, 2) != 0) {
+					printf("RX ERR: wrong souce address on response frame\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				printf("RX: Response frame\n");
+				dwt_readrxtimestamp(timestamp_buffer);
+				rx_timestamp_response = decode_40bit_timestamp(timestamp_buffer);
+
+				pdoa_tx = dwt_readpdoa(); 
+
+				/* Accept frame and continue ranging */
+				next_sequence_number++;
+				rx_done = 2;
+			}
+
+			if ((tx_done == 2) && (rx_done == 2)) {
+				tx_done = 0;
+				rx_done = 0;
+
+				/* Send final frame (4/4) */
+				final_frame.sequence_number = next_sequence_number++;
+
+				tx_timestamp_final = rx_timestamp_response + round_tx_delay;
+
+				uint64_t Tround1 = rx_timestamp_response - tx_timestamp_poll;
+				uint64_t Treply2 = tx_timestamp_final - rx_timestamp_response;
+
+				final_frame.poll_resp_round_time[0] = (uint8_t)Tround1;
+				final_frame.poll_resp_round_time[1] = (uint8_t)(Tround1 >> 8);
+				final_frame.poll_resp_round_time[2] = (uint8_t)(Tround1 >> 16);
+				final_frame.poll_resp_round_time[3] = (uint8_t)(Tround1 >> 32);
+
+				final_frame.resp_final_reply_time[0] = (uint8_t)Treply2;
+				final_frame.resp_final_reply_time[1] = (uint8_t)(Treply2 >> 8);
+				final_frame.resp_final_reply_time[2] = (uint8_t)(Treply2 >> 16);
+				final_frame.resp_final_reply_time[3] = (uint8_t)(Treply2 >> 32);
+
+				final_frame.pdoa_tx = pdoa_tx;
+
+				dwt_writetxdata(sizeof(final_frame), (uint8_t *)&final_frame, 0);
+				dwt_writetxfctrl(sizeof(final_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
+
+				/* Start transmission at the time we embedded into the message */
+				state = TWR_FINAL_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
+				dwt_setdelayedtrxtime(tx_timestamp_final >> 8);
+				int r = dwt_starttx(DWT_START_RX_DELAYED | DWT_RESPONSE_EXPECTED);
+				if (r != DWT_SUCCESS) {
+					printf("TX ERR: delayed send time missed");
+					state = TWR_ERROR;
+					continue;
+				}
+			}
+			break;
+		case TWR_FINAL_STATE_ANC:
+			if (tx_done == 1) {
+				tx_done = 0;
+				printf("TX: Final frame\n");
+				state = TWR_SYNC_STATE_ANC;
+			}
+			break;
+
+		/*		------------------------------------------------- TAG CODE -------------------------------------------------	 */
+
+		case TWR_SYNC_STATE_TAG:
 			/* Send sync frame (1/4) */
 			last_sync_time = millis(); // replaced HAL_GetTick() 
 			sync_frame.sequence_number = next_sequence_number++;
@@ -196,7 +420,7 @@ int application_twr_pdoa_tag(void)
 			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
 			dwt_writetxfctrl(sizeof(sync_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 
-			state = TWR_POLL_RESPONSE_STATE; /* Set early to ensure tx done interrupt arrives in new state */
+			state = TWR_POLL_RESPONSE_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
 			int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 			if (r != DWT_SUCCESS) {
 				state = TWR_ERROR;
@@ -204,7 +428,7 @@ int application_twr_pdoa_tag(void)
 				continue;
 			}
 			break;
-		case TWR_POLL_RESPONSE_STATE:
+		case TWR_POLL_RESPONSE_STATE_TAG:
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Sync frame\n");
@@ -275,7 +499,7 @@ int application_twr_pdoa_tag(void)
 				dwt_writetxfctrl(sizeof(response_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 
 				// Send response after a fixed delay
-				state = TWR_FINAL_STATE; /* Set early to ensure tx done interrupt arrives in new state */
+				state = TWR_FINAL_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
 				dwt_setdelayedtrxtime((uint32_t)((rx_timestamp_poll + round_tx_delay) >> 8));
 				int r = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
@@ -285,7 +509,7 @@ int application_twr_pdoa_tag(void)
 				}
 			}
 			break;
-		case TWR_FINAL_STATE:
+		case TWR_FINAL_STATE_TAG:
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Response frame\n");
@@ -392,7 +616,7 @@ int application_twr_pdoa_tag(void)
 				/* Begin next ranging exchange */
 				tx_done = 0;
 				rx_done = 0;
-				state = TWR_SYNC_STATE;
+				state = TWR_SYNC_STATE_TAG;
 
 				// Short sleep, after succesful communication
 				//Sleep(200);
@@ -401,7 +625,9 @@ int application_twr_pdoa_tag(void)
 		case TWR_ERROR:
 			dwt_forcetrxoff();  // make sure receiver is off after an error
 			printf("Ranging error -> reset\n");
-			state = TWR_SYNC_STATE;
+			// Maybe do things differently here: how many attempts should an tag have before it returns to become an anchor?
+			tag_mode = 0; 
+			state = TWR_SYNC_STATE_ANC; // become an anchor
 			Sleep(200);
 		}
 	}
@@ -437,6 +663,7 @@ static void rx_ok_cb(const dwt_cb_data_t *cb_data)
 {
 	rx_done = 1;
 	new_frame_length = cb_data->datalength;
+	last_recieve_time = millis();
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------

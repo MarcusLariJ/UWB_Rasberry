@@ -70,13 +70,13 @@ const uint16_t CHIPID_ADDR = 0x06;
 uint32_t device_id;
 
 enum state_t {
-	TWR_SYNC_STATE,
-	TWR_POLL_RESPONSE_STATE,
-	TWR_FINAL_STATE,
+	TWR_SYNC_STATE_ANC,
+	TWR_POLL_RESPONSE_STATE_ANC,
+	TWR_FINAL_STATE_ANC,
 	TWR_ERROR,
 };
 
-enum state_t state = TWR_SYNC_STATE;
+enum state_t state = TWR_SYNC_STATE_ANC;
 
 /**
  * Application entry point.
@@ -155,7 +155,7 @@ int application_twr_anchor(void)
 	while (1)
 	{
 		switch (state) {
-		case TWR_SYNC_STATE:
+		case TWR_SYNC_STATE_ANC:
 			/* Wait for sync frame (1/4) */
 			if (new_frame)
 			{
@@ -200,7 +200,7 @@ int application_twr_anchor(void)
 				next_sequence_number = rx_frame_pointer->sequence_number + 1;
 
 				/* Send poll frame (2/4) */
-				state = TWR_POLL_RESPONSE_STATE; /* Set early to ensure tx done interrupt arrives in new state */
+				state = TWR_POLL_RESPONSE_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
 				poll_frame.sequence_number = next_sequence_number++;
 				dwt_writetxdata(sizeof(poll_frame), (uint8_t *)&poll_frame, 0);
 				dwt_writetxfctrl(sizeof(poll_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
@@ -212,7 +212,7 @@ int application_twr_anchor(void)
 				}
 			}
 			break;
-		case TWR_POLL_RESPONSE_STATE:
+		case TWR_POLL_RESPONSE_STATE_ANC:
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Poll frame\n");
@@ -304,7 +304,7 @@ int application_twr_anchor(void)
 				dwt_writetxfctrl(sizeof(final_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 
 				/* Start transmission at the time we embedded into the message */
-				state = TWR_FINAL_STATE; /* Set early to ensure tx done interrupt arrives in new state */
+				state = TWR_FINAL_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
 				dwt_setdelayedtrxtime(tx_timestamp_final >> 8);
 				int r = dwt_starttx(DWT_START_RX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
@@ -314,16 +314,16 @@ int application_twr_anchor(void)
 				}
 			}
 			break;
-		case TWR_FINAL_STATE:
+		case TWR_FINAL_STATE_ANC:
 			if (tx_done == 1) {
 				tx_done = 0;
 				printf("TX: Final frame\n");
-				state = TWR_SYNC_STATE;
+				state = TWR_SYNC_STATE_ANC;
 			}
 			break;
 		case TWR_ERROR:
 			printf("Ranging error -> reset\n");
-			state = TWR_SYNC_STATE;
+			state = TWR_SYNC_STATE_ANC;
 			Sleep(200);
 			dwt_rxenable(DWT_START_RX_IMMEDIATE);
 		}
