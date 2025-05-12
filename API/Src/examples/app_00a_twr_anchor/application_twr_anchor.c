@@ -5,13 +5,11 @@
  *      Author: Tobias Margiani
  */
 
-//#include "applications.h"
 #include <example_selection.h>
 
 #include <stdio.h>
 #include <string.h>
 
-//#include "main.h"
 #include <deca_regs.h>
 #include <deca_spi.h>
 #include <port.h>
