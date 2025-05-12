@@ -122,8 +122,8 @@ uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
 static const uint64_t round_tx_delay = 10000llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
-static const unsigned int ranging_timeout = 100; // (10 ms) 100 ms
-static const unsigned int avg_tx_timeout = 100; // (5 ms) 100 ms, Should be at least four times that of round_tx_delay 
+static const unsigned int ranging_timeout = 1000; // (10 ms) 100 ms
+static const unsigned int avg_tx_timeout = 10000; // (5 ms) 100 ms, Should be at least four times that of round_tx_delay 
 unsigned int tx_timeout = avg_tx_timeout/2; // the timeout, before reverting to anchor
 
 void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
@@ -203,9 +203,9 @@ int application_twr_pdoa_tag(void)
 
     /*Get unique chip ID from OTP memory as device identification*/
 	dwt_otpread(CHIPID_ADDR, &device_id, 1);
-	printf("Chip ID: %u\n", device_id);
 	uint8_t my_ID[2]; // id of tag 
 	memcpy(my_ID, &device_id, 2); // dirty way of setting unique ID for each device 
+	printf("My ID: %u\n", *(uint16_t *)my_ID);
 	uint8_t your_ID_list[2*DEVICE_MAX_NUM]; // list of devices to communicate with
 	uint8_t device_num = 0; // current number of known devices
 	uint8_t device_crt = 0; // the current index of device
@@ -290,7 +290,7 @@ int application_twr_pdoa_tag(void)
 					}
 				}
 				if (!device_known){
-					printf("UNKNOWN SRC ADDRESS. Adding it to list\n");
+					printf("UNKNOWN SRC ADDRESS. Adding %u to list\n", *(uint16_t *)rx_frame_pointer->src_address);
 					if (device_num < DEVICE_MAX_NUM){
 						memcpy(&your_ID_list[device_num*2], rx_frame_pointer->src_address, 2);
 						device_num++; 
