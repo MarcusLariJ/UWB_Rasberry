@@ -320,6 +320,9 @@ int application_twr_pdoa_tag(void)
 
 				/* Send poll frame (2/4) */
 				state = TWR_POLL_RESPONSE_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
+				// set dest and src:
+				memcpy(poll_frame.src_address, my_ID, 2);
+				memcpy(poll_frame.dst_address, your_ID, 2);
 				poll_frame.sequence_number = next_sequence_number++;
 				dwt_writetxdata(sizeof(poll_frame), (uint8_t *)&poll_frame, 0);
 				dwt_writetxfctrl(sizeof(poll_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
@@ -401,6 +404,9 @@ int application_twr_pdoa_tag(void)
 				rx_done = 0;
 
 				/* Send final frame (4/4) */
+				// set dest and src:
+				memcpy(final_frame.src_address, my_ID, 2);
+				memcpy(final_frame.dst_address, your_ID, 2);
 				final_frame.sequence_number = next_sequence_number++;
 
 				tx_timestamp_final = rx_timestamp_response + round_tx_delay;
@@ -482,8 +488,9 @@ int application_twr_pdoa_tag(void)
 			}
 			last_sync_time = millis(); // replaced HAL_GetTick() 
 			sync_frame.sequence_number = next_sequence_number++;
-			sync_frame.dst_address[0] = your_ID[0];
-			sync_frame.dst_address[1] = your_ID[1];
+			// Set the destination and source
+			memcpy(sync_frame.dst_address, your_ID, 2);
+			memcpy(sync_frame.src_address, my_ID, 2);
 			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
 			dwt_writetxfctrl(sizeof(sync_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 
@@ -561,6 +568,9 @@ int application_twr_pdoa_tag(void)
 				rx_done = 0;
 
 				/* Send response frame (3/4) */
+				// Set the destination and source
+				memcpy(response_frame.dst_address, your_ID, 2);
+				memcpy(response_frame.src_address, my_ID, 2);
 				response_frame.sequence_number = next_sequence_number++;
 				dwt_writetxdata(sizeof(response_frame), (uint8_t *)&response_frame, 0);
 				dwt_writetxfctrl(sizeof(response_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
