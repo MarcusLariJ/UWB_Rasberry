@@ -203,9 +203,9 @@ int application_twr_pdoa_tag(void)
 
     /*Get unique chip ID from OTP memory as device identification*/
 	dwt_otpread(CHIPID_ADDR, &device_id, 1);
-	printf("ID: %u\n", device_id);
 	uint8_t my_ID[2]; // id of tag 
-	memcpy(my_ID, &device_id, 2); // dirty way of setting unique ID for each device 
+	my_ID[0] = device_id >> 24 & 0xFF;
+	my_ID[1] = device_id >> 16 & 0xFF;
 	print_hex(my_ID, 2);
 	uint8_t your_ID_list[2*DEVICE_MAX_NUM]; // list of devices to communicate with
 	uint8_t device_num = 0; // current number of known devices
