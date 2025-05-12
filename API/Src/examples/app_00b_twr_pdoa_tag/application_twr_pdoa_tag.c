@@ -27,7 +27,7 @@
 #if defined(APP_TWR_PDOA)
 
 #define DEVICE_MAX_NUM 10 // number of expected devices to communicate with
-#define FORCE_ANCHOR 0 // Force the device to be an anchor and never enter tag mode
+#define FORCE_ANCHOR 1 // Force the device to be an anchor and never enter tag mode
 
 static void tx_done_cb(const dwt_cb_data_t *cb_data);
 static void rx_ok_cb(const dwt_cb_data_t *cb_data);
@@ -127,7 +127,7 @@ static const unsigned int avg_tx_timeout = 10000; // (5 ms) 100 ms, Should be at
 unsigned int tx_timeout = avg_tx_timeout/2; // the timeout, before reverting to anchor
 
 void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
-
+void print_hex(const uint8_t *bytes, size_t length);
 /**
  * Application entry point.
  */
@@ -203,15 +203,18 @@ int application_twr_pdoa_tag(void)
 
     /*Get unique chip ID from OTP memory as device identification*/
 	dwt_otpread(CHIPID_ADDR, &device_id, 1);
+	printf("ID: %u\n", device_id);
 	uint8_t my_ID[2]; // id of tag 
 	memcpy(my_ID, &device_id, 2); // dirty way of setting unique ID for each device 
-	printf("My ID: %u\n", *(uint16_t *)my_ID);
+	print_hex(my_ID, 2);
 	uint8_t your_ID_list[2*DEVICE_MAX_NUM]; // list of devices to communicate with
 	uint8_t device_num = 0; // current number of known devices
 	uint8_t device_crt = 0; // the current index of device
 	uint8_t your_ID[2]; // expected address of incoming message
 
-
+	if (FORCE_ANCHOR) {
+		printf("Device set as anchor.\n");
+	}
 	printf("Wait 3s before starting...\n");
     Sleep(3000);
 
@@ -290,9 +293,10 @@ int application_twr_pdoa_tag(void)
 					}
 				}
 				if (!device_known){
-					printf("UNKNOWN SRC ADDRESS. Adding %u to list\n", *(uint16_t *)rx_frame_pointer->src_address);
+					printf("UNKNOWN SRC ADDRESS. Adding following to list:\n");
 					if (device_num < DEVICE_MAX_NUM){
 						memcpy(&your_ID_list[device_num*2], rx_frame_pointer->src_address, 2);
+						print_hex(&your_ID_list[device_num*2], 2);
 						device_num++; 
 					} else {
 						printf("Device list full. Ignoring");
@@ -767,6 +771,13 @@ void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pd
 	printf(print_buffer);
 
 	csv_write_rx(pdoa_read_rx, tdoa_read, current_rotation);
+}
+
+void print_hex(const uint8_t *bytes, size_t length) {
+	for (size_t i = 0; i < length; i++) {
+		printf("%02X ", bytes[i]);
+	}
+	printf("\n");
 }
 
 #endif
