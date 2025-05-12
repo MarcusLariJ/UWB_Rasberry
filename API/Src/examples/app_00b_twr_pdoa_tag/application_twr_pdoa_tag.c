@@ -446,6 +446,7 @@ int application_twr_pdoa_tag(void)
 				printf("TX: Final frame\n");
 				state = TWR_SYNC_STATE_ANC;
 			}
+			break;
 		case TWR_ERROR_ANC:
 			printf("Anchor error -> reset\n");
 			state = TWR_SYNC_STATE_ANC;
