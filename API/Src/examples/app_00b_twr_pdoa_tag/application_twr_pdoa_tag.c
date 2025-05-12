@@ -26,6 +26,9 @@
 
 #if defined(APP_TWR_PDOA)
 
+#define DEVICE_MAX_NUM 10 // number of expected devices to communicate with
+#define FORCE_ANCHOR 0 // Force the device to be an anchor and never enter tag mode
+
 static void tx_done_cb(const dwt_cb_data_t *cb_data);
 static void rx_ok_cb(const dwt_cb_data_t *cb_data);
 static void rx_err_cb(const dwt_cb_data_t *cb_data);
@@ -86,8 +89,6 @@ twr_final_frame_t final_frame = {
 
 const static size_t max_frame_length = sizeof(twr_final_frame_t) + 2;
 
-const static uint64_t round_tx_delay = 10000llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
-
 uint64_t rx_timestamp_poll = 0;
 uint64_t tx_timestamp_response = 0;
 uint64_t rx_timestamp_final = 0;
@@ -112,15 +113,18 @@ enum state_t {
 	TWR_SYNC_STATE_ANC,
 	TWR_POLL_RESPONSE_STATE_ANC,
 	TWR_FINAL_STATE_ANC,
-	TWR_ERROR,
+	TWR_ERROR_TAG,
+	TWR_ERROR_ANC,
 };
 
-enum state_t state = TWR_SYNC_STATE_TAG;
+enum state_t state = TWR_SYNC_STATE_ANC;
 uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
-const static int ranging_timeout = 1000;
-const int attempt_transmit_timeout = 5; // 5 ms, more tha enough for a TWR exchange 
+const static uint64_t round_tx_delay = 10000llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
+const static uint64_t ranging_timeout = 100; // (10 ms) 100 ms
+const static uint64_t avg_tx_timeout = 100; // (5 ms) 100 ms, Should be at least four times that of round_tx_delay 
+uint64_t tx_timeout = 0; // the timeout, before reverting to anchor
 
 void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
 
@@ -197,8 +201,13 @@ int application_twr_pdoa_tag(void)
     /*Get unique chip ID from OTP memory as device identification*/
 	dwt_otpread(CHIPID_ADDR, &device_id, 1);
 	printf("Chip ID: %u\n", device_id);
-	uint8_t my_ID[2] = { 'T', 'T' }; // set the ID of the tag
+	uint8_t my_ID[2]; // id of tag 
+	memcpy(my_ID, &device_id, 2); // dirty way of setting unique ID for each device 
+	uint8_t your_ID_list[2*DEVICE_MAX_NUM]; // list of devices to communicate with
+	uint8_t device_num = 0; // current number of known devices
+	uint8_t device_crt = 0; // the current index of device
 	uint8_t your_ID[2]; // expected address of incoming message
+
 
 	printf("Wait 3s before starting...");
     Sleep(3000);
@@ -207,11 +216,11 @@ int application_twr_pdoa_tag(void)
 	{
 		/* check ranging timeout and restart ranging if necessary  */
 		if (tag_mode && (millis() - last_sync_time) > ranging_timeout) { 
-			dwt_forcetrxoff();  // make sure receiver is off after a timeout (what to do about this??)
+			//dwt_forcetrxoff();  // make sure receiver is off after a timeout (what to do about this??)
 			printf("Timeout -> reset\n");
-			tag_mode = 0;
-			state = TWR_SYNC_STATE_ANC; // if we timeout, go back to being an anchor (TODO: maybe stay an anchor?)
-			rx_timestamp_poll = 0;
+			last_sync_time = millis();
+			state = TWR_ERROR_TAG; 
+			rx_timestamp_poll = 0; // maybe delete all this
 			tx_timestamp_response = 0;
 			rx_timestamp_final = 0;
 			tx_done = 0;
@@ -223,38 +232,39 @@ int application_twr_pdoa_tag(void)
 		/*		------------------------------------------------- ANCHOR CODE -------------------------------------------------	 */
 		
 		case TWR_SYNC_STATE_ANC:
-			/* Wait for sync frame (1/4) */
-			
-			/* If it is time to transmit: */
-			if (!tag_mode && (millis() - last_recieve_time) > attempt_transmit_timeout + ((float)rand()/RAND_MAX)*attempt_transmit_timeout) {
-				dwt_forcetrxoff();
-				last_sync_time = millis();
-				last_recieve_time = millis();
-				printf("Time to transmit!");
-				tag_mode = 1;
-				state = TWR_SYNC_STATE_TAG; // We become a tag
-				tx_timestamp_poll = 0;
-				rx_timestamp_response = 0;
-				tx_timestamp_final = 0;
-				tx_done = 0;
-				rx_done = 0;
-				rand();
+			/* If device is forced to be an anchor only, then never change over to tag */
+			if (!FORCE_ANCHOR){
+				/* Calculate random timeout time, centered around the average*/
+				tx_timeout = avg_tx_timeout/2 + (rand() % avg_tx_timeout);
+				if ((millis() - last_recieve_time) > tx_timeout) {
+					/* If it is time to transmit: */
+					dwt_forcetrxoff();
+					last_sync_time = millis();
+					printf("Time to transmit!");
+					tag_mode = 1;
+					state = TWR_SYNC_STATE_TAG; // We become a tag
+					tx_timestamp_poll = 0;
+					rx_timestamp_response = 0;
+					tx_timestamp_final = 0;
+					tx_done = 0;
+					rx_done = 0;
+				}
 			}
-
+			/* Wait for sync frame (1/4) */
 			if (rx_done)
 			{
 				rx_done = 0;
 
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
 					printf("RX ERR: wrong frame length\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
 					printf("RX ERR: bad STS quality\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 
@@ -264,22 +274,40 @@ int application_twr_pdoa_tag(void)
 
 				if (rx_frame_pointer->twr_function_code != 0x20) {  /* ranging init */
 					printf("RX ERR: wrong frame (expected sync)\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 
+				// Now we know it is a sync frame, we can check if we know the src address:
+				uint8_t device_known = 0;
+				for (int i=0; i < device_num; i++){
+					if (memcmp(&your_ID_list[i*2], rx_frame_pointer->src_address, 2) == 0){
+						// we know the device. Ignore it
+						device_known = 1;
+						break;
+					}
+				}
+				if (!device_known){
+					printf("UNKNOWN SRC ADDRESS. Adding it to list\n");
+					if (device_num < DEVICE_MAX_NUM){
+						memcpy(&your_ID_list[device_num*2], rx_frame_pointer->src_address, 2);
+						device_num++; 
+					} else {
+						printf("Device list full. Ignoring");
+					}	
+				}				
+				
 				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
 					printf("RX ERR: wrong dest address on sync frame\n");
-					// TODO: If we do not know this address, add it to list of addresses to try to transmit to
-					state = TWR_ERROR;
+	
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 
 				printf("RX: Sync frame\n");
 
 				/* Set the expected source to that of the incoming messages source, to ignore all other messages*/
-				your_ID[0] = rx_frame_pointer->src_address[0];
-				your_ID[1] = rx_frame_pointer->src_address[1];
+				memcpy(your_ID, rx_frame_pointer->src_address, 2);
 
 				/* Initialize the sequence number for this ranging exchange */
 				next_sequence_number = rx_frame_pointer->sequence_number + 1;
@@ -292,7 +320,7 @@ int application_twr_pdoa_tag(void)
 				int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
 					printf("TX ERR: could not send poll frame\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 			}
@@ -311,14 +339,14 @@ int application_twr_pdoa_tag(void)
 
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
 					printf("RX ERR: wrong frame length\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
 					printf("RX ERR: bad STS quality\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 
@@ -328,25 +356,25 @@ int application_twr_pdoa_tag(void)
 
 				if (rx_frame_pointer->twr_function_code != 0x10) { /* response */
 					printf("RX ERR: wrong frame (expected response)\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
 					printf("RX ERR: wrong sequence number\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 
 				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
 					printf("RX ERR: wrong dest address on response frame\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 				
 				if (memcmp(your_ID, rx_frame_pointer->src_address, 2) != 0) {
 					printf("RX ERR: wrong souce address on response frame\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 
@@ -354,6 +382,7 @@ int application_twr_pdoa_tag(void)
 				dwt_readrxtimestamp(timestamp_buffer);
 				rx_timestamp_response = decode_40bit_timestamp(timestamp_buffer);
 
+				/* get the PDoA of the response frame (AoD)*/
 				pdoa_tx = dwt_readpdoa(); 
 
 				/* Accept frame and continue ranging */
@@ -394,7 +423,7 @@ int application_twr_pdoa_tag(void)
 				int r = dwt_starttx(DWT_START_RX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
 					printf("TX ERR: delayed send time missed");
-					state = TWR_ERROR;
+					state = TWR_ERROR_ANC;
 					continue;
 				}
 			}
@@ -405,16 +434,46 @@ int application_twr_pdoa_tag(void)
 				printf("TX: Final frame\n");
 				state = TWR_SYNC_STATE_ANC;
 			}
+		case TWR_ERROR_ANC:
+			printf("Anchor error -> reset\n");
+			state = TWR_SYNC_STATE_ANC;
+			Sleep(100);
+			dwt_rxenable(DWT_START_RX_IMMEDIATE);
 			break;
 
 		/*		------------------------------------------------- TAG CODE -------------------------------------------------	 */
 
 		case TWR_SYNC_STATE_TAG:
 			/* Send sync frame (1/4) */
+			// First check if we have looped through all destination addresses
+			if (device_crt >= device_num) {
+				if (device_crt == 0){
+					// Special case: there's currently no known devices. So just broadcast some crap, and get to know someone!
+					printf("Sending random msg: Notice me!\n");
+					memcpy(your_ID, your_ID_list, 2);
+					device_crt++;
+				} else {
+					dwt_forcetrxoff();
+					last_recieve_time = millis();
+					printf("No devices left: Changing into anchor\n");
+					state = TWR_SYNC_STATE_ANC;
+					device_crt = 0;
+					tag_mode = 0;
+					rx_timestamp_poll = 0;
+					tx_timestamp_response = 0;
+					rx_timestamp_final = 0;
+					tx_done = 0;
+					rx_done = 0;
+					continue;
+				}
+			} else {
+				// If there is still devices left, then access these 
+				printf("Next address\n");
+				memcpy(your_ID, &your_ID_list[device_crt*2], 2);
+				device_crt++;
+			}
 			last_sync_time = millis(); // replaced HAL_GetTick() 
 			sync_frame.sequence_number = next_sequence_number++;
-			your_ID[0] = 'A'; // The wanted dest should be set by the communication protocol
-			your_ID[1] = 'A';		
 			sync_frame.dst_address[0] = your_ID[0];
 			sync_frame.dst_address[1] = your_ID[1];
 			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
@@ -423,8 +482,8 @@ int application_twr_pdoa_tag(void)
 			state = TWR_POLL_RESPONSE_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
 			int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 			if (r != DWT_SUCCESS) {
-				state = TWR_ERROR;
-				printf("TX ERR: could not send sync frame");
+				state = TWR_ERROR_TAG;
+				printf("TX ERR: could not send sync frame\n");
 				continue;
 			}
 			break;
@@ -440,14 +499,14 @@ int application_twr_pdoa_tag(void)
 
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
 					printf("RX ERR: wrong frame length\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
 					printf("RX ERR: bad STS quality\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
@@ -457,25 +516,25 @@ int application_twr_pdoa_tag(void)
 
 				if (rx_frame_pointer->twr_function_code != 0x21) { /* poll */
 					printf("RX ERR: wrong frame (expected poll)\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
 					printf("RX ERR: wrong sequence number\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
 				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
 					printf("RX ERR: wrong dest address on poll frame\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
 				if (memcmp(your_ID, rx_frame_pointer->src_address, 2) != 0) {
 					printf("RX ERR: wrong source address on poll frame\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
@@ -504,7 +563,7 @@ int application_twr_pdoa_tag(void)
 				int r = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
 					printf("TX ERR: delayed send time missed\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 			}
@@ -523,14 +582,14 @@ int application_twr_pdoa_tag(void)
 
 				if (new_frame_length != sizeof(twr_final_frame_t)+2) {
 					printf("RX ERR: wrong frame length\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
 					printf("RX ERR: bad STS quality\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
@@ -540,25 +599,25 @@ int application_twr_pdoa_tag(void)
 
 				if (rx_frame_pointer->twr_function_code != 0x23) { /* final */
 					printf("RX ERR: wrong frame (expected final)\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
 					printf("RX ERR: wrong sequence number\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 				
 				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
 					printf("RX ERR: wrong dest address on final frame\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
 				if (memcmp(your_ID, rx_frame_pointer->src_address, 2) != 0) {
 					printf("RX ERR: wrong source address on final frame\n");
-					state = TWR_ERROR;
+					state = TWR_ERROR_TAG;
 					continue;
 				}
 
@@ -622,13 +681,11 @@ int application_twr_pdoa_tag(void)
 				//Sleep(200);
 			}
 			break;
-		case TWR_ERROR:
+		case TWR_ERROR_TAG:
 			dwt_forcetrxoff();  // make sure receiver is off after an error
-			printf("Ranging error -> reset\n");
-			// Maybe do things differently here: how many attempts should an tag have before it returns to become an anchor?
-			tag_mode = 0; 
-			state = TWR_SYNC_STATE_ANC; // become an anchor
-			Sleep(200);
+			printf("Tag error -> reset\n");
+			state = TWR_SYNC_STATE_TAG;
+			Sleep(100);
 		}
 	}
 
