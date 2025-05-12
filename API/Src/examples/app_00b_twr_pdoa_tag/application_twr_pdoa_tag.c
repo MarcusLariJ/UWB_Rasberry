@@ -28,6 +28,7 @@
 
 #define DEVICE_MAX_NUM 10 // number of expected devices to communicate with
 #define FORCE_ANCHOR 0 // Force the device to be an anchor and never enter tag mode
+#define FORCE_TAG 0 // Force the device to be a tag
 
 static void tx_done_cb(const dwt_cb_data_t *cb_data);
 static void rx_ok_cb(const dwt_cb_data_t *cb_data);
@@ -209,13 +210,28 @@ int application_twr_pdoa_tag(void)
 	my_ID[0] = device_id >> 24 & 0xFF;
 	my_ID[1] = device_id >> 16 & 0xFF;
 	print_hex(my_ID, 2);
-	uint8_t your_ID_list[] = {0x96, 0xC2, 0x16, 0xC2}; // list of devices to communicate with. This is hardcoded for now
-	uint8_t device_num = 2; // current number of known devices
+	/*This hacky code is a way to make sure that the devices own ID dosent appear with the other IDs*/
+	uint8_t known_IDs[] = {0x96, 0xC2, 0x16, 0xC2};
+	uint8_t device_num = 1; // current number of known devices
 	uint8_t device_crt = 0; // the current index of device
 	uint8_t your_ID[2]; // expected address of incoming message
+	uint8_t your_ID_list[device_num*2];
+	int temp_idx = 0;
+	for (int i=0; i < (device_num+1); i++){
+		if (memcmp(my_ID, &known_IDs[i*2], 2) != 0)
+		{
+			print_hex(&known_IDs[2*i], 2);
+			your_ID_list[temp_idx++] = known_IDs[2*i];
+			your_ID_list[temp_idx++] = known_IDs[2*i+1];
+		}
+	}
 
 	if (FORCE_ANCHOR) {
 		printf("Device set as anchor.\n");
+	}
+	if (FORCE_TAG) {
+		state = TWR_SYNC_STATE_TAG;
+		printf("Device set as tag.\n");
 	}
 	printf("Wait 3s before starting...\n");
     Sleep(3000);
@@ -480,20 +496,26 @@ int application_twr_pdoa_tag(void)
 					memcpy(your_ID, your_ID_list, 2);
 					device_crt++;
 				} else {
-					// restart the receiver and turn off transmitter
-					dwt_forcetrxoff();
-					dwt_rxenable(DWT_START_RX_IMMEDIATE);
-					last_recieve_time = millis();
-					printf("No devices left: Changing into anchor\n");
-					state = TWR_SYNC_STATE_ANC;
-					device_crt = 0;
-					tag_mode = 0;
-					rx_timestamp_poll = 0;
-					tx_timestamp_response = 0;
-					rx_timestamp_final = 0;
-					tx_done = 0;
-					rx_done = 0;
-					continue;
+					if (!FORCE_TAG){
+						// restart the receiver and turn off transmitter
+						dwt_forcetrxoff();
+						dwt_rxenable(DWT_START_RX_IMMEDIATE);
+						last_recieve_time = millis();
+						printf("No devices left: Changing into anchor\n");
+						state = TWR_SYNC_STATE_ANC;
+						device_crt = 0;
+						tag_mode = 0;
+						rx_timestamp_poll = 0;
+						tx_timestamp_response = 0;
+						rx_timestamp_final = 0;
+						tx_done = 0;
+						rx_done = 0;
+						continue;
+					} else {
+						// just keep looping. if forced as tag
+						device_crt = 0;
+						continue;
+					}
 				}
 			} else {
 				// If there is still devices left, then access these 
