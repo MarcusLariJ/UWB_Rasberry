@@ -122,12 +122,14 @@ uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
 static const uint64_t round_tx_delay = 10000llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
-static const unsigned int ranging_timeout = 1000; // (10 ms) 100 ms
+static const unsigned int tag_sync_timeout = 1000; // (10 ms) 100 ms
+static const unsigned int anc_resp_timeout = 700; // slightly smaller than sync timeout
 static const unsigned int avg_tx_timeout = 10000; // (5 ms) 100 ms, Should be at least four times that of round_tx_delay 
 unsigned int tx_timeout = avg_tx_timeout/2; // the timeout, before reverting to anchor
 
 void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
 void print_hex(const uint8_t *bytes, size_t length);
+int8_t checkTO(unsigned int * last_time, unsigned int timeout);
 /**
  * Application entry point.
  */
@@ -207,8 +209,8 @@ int application_twr_pdoa_tag(void)
 	my_ID[0] = device_id >> 24 & 0xFF;
 	my_ID[1] = device_id >> 16 & 0xFF;
 	print_hex(my_ID, 2);
-	uint8_t your_ID_list[2*DEVICE_MAX_NUM]; // list of devices to communicate with
-	uint8_t device_num = 0; // current number of known devices
+	uint8_t your_ID_list[] = {0x96, 0xC2, 0x16, 0xC2}; // list of devices to communicate with. This is hardcoded for now
+	uint8_t device_num = 2; // current number of known devices
 	uint8_t device_crt = 0; // the current index of device
 	uint8_t your_ID[2]; // expected address of incoming message
 
@@ -221,6 +223,7 @@ int application_twr_pdoa_tag(void)
 	while (1)
 	{
 		/* check ranging timeout and restart ranging if necessary  */
+		/*
 		if (tag_mode && (millis() - last_sync_time) > ranging_timeout) { 
 			printf("Timeout -> reset\n");
 			last_sync_time = millis();
@@ -230,7 +233,7 @@ int application_twr_pdoa_tag(void)
 			rx_timestamp_final = 0;
 			tx_done = 0;
 			rx_done = 0;
-		}
+		} */
 
 		switch (state) {
 		
@@ -244,7 +247,7 @@ int application_twr_pdoa_tag(void)
 					dwt_forcetrxoff();
 					/* Calculate random timeout time, centered around the average*/
 					tx_timeout = avg_tx_timeout/2 + (rand() % avg_tx_timeout);
-					last_sync_time = millis();
+					//last_sync_time = millis();
 					printf("Changing into tag\n");
 					tag_mode = 1;
 					state = TWR_SYNC_STATE_TAG; // We become a tag
@@ -282,7 +285,7 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_ANC;
 					continue;
 				}
-
+				/* code for adding new devices dynamically. Commented out since we assume known addresses
 				// Now we know it is a sync frame, we can check if we know the src address:
 				uint8_t device_known = 0;
 				for (int i=0; i < device_num; i++){
@@ -301,7 +304,8 @@ int application_twr_pdoa_tag(void)
 					} else {
 						printf("Device list full. Ignoring");
 					}	
-				}				
+				}
+				*/				
 				
 				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
 					printf("RX ERR: wrong dest address on sync frame\n");
@@ -340,6 +344,16 @@ int application_twr_pdoa_tag(void)
 				printf("TX: Poll frame\n");
 				dwt_readtxtimestamp(timestamp_buffer);
 				tx_timestamp_poll = decode_40bit_timestamp(timestamp_buffer);
+				last_sync_time = millis();
+			}
+
+			/* check timeout for response frame*/
+			if (rx_done == 0 && tx_done == 2){
+				if (checkTO(&last_sync_time, anc_resp_timeout)){
+					printf("Anchor response timeout\n");
+					state = TWR_ERROR_ANC;
+					continue;
+				}
 			}
 
 			/* Wait for response frame (3/4) */
@@ -487,7 +501,7 @@ int application_twr_pdoa_tag(void)
 				memcpy(your_ID, &your_ID_list[device_crt*2], 2);
 				device_crt++;
 			}
-			last_sync_time = millis(); // replaced HAL_GetTick() 
+			//last_sync_time = millis(); // replaced HAL_GetTick() 
 			sync_frame.sequence_number = next_sequence_number++;
 			// Set the destination and source
 			memcpy(sync_frame.dst_address, your_ID, 2);
@@ -507,6 +521,16 @@ int application_twr_pdoa_tag(void)
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Sync frame\n");
+				last_sync_time = millis();
+			}
+
+			/* Poll frame timeout*/
+			if (rx_done == 0 && tx_done == 2){
+				if (checkTO(&last_sync_time, tag_sync_timeout)){
+					printf("Tag Poll timeout\n");
+					state = TWR_ERROR_TAG;
+					continue;
+				}
 			}
 
 			/* Wait for poll frame (2/4) */
@@ -593,6 +617,16 @@ int application_twr_pdoa_tag(void)
 				printf("TX: Response frame\n");
 				dwt_readtxtimestamp(timestamp_buffer);
 				tx_timestamp_response = decode_40bit_timestamp(timestamp_buffer);
+				last_sync_time = millis();
+			}
+			
+			/* check timeout for response frame*/
+			if (rx_done == 0 && tx_done == 2){
+				if (checkTO(&last_sync_time, tag_sync_timeout)){
+					printf("Tag final timeout\n");
+					state = TWR_ERROR_TAG;
+					continue;
+				}
 			}
 
 			/* Wait for final frame (4/4) */
@@ -693,9 +727,6 @@ int application_twr_pdoa_tag(void)
 				tx_done = 0;
 				rx_done = 0;
 				state = TWR_SYNC_STATE_TAG;
-
-				// Short sleep, after succesful communication
-				//Sleep(200);
 			}
 			break;
 		case TWR_ERROR_TAG:
@@ -756,6 +787,25 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data)
 	dwt_forcetrxoff();
 	dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
+
+int8_t checkTO(unsigned int * last_time, unsigned int timeout){
+		/* check ranging timeout and restart ranging if necessary  */
+		if ((millis() - *last_time) > timeout) { 
+			//*last_time = millis();
+			rx_timestamp_poll = 0; // maybe delete all this
+			tx_timestamp_poll = 0;
+			rx_timestamp_response = 0;
+			tx_timestamp_response = 0;
+			rx_timestamp_final = 0;
+			tx_timestamp_final = 0;
+			tx_done = 0;
+			rx_done = 0;
+			return 1;
+		} else {
+			return 0;
+		}
+}
+
 
 void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa) {
 	// Readable pdoa stuff
