@@ -187,6 +187,9 @@ int application_twr_pdoa_tag(void)
     /* Enable IC diagnostic calculation and logging */
     dwt_configciadiag(DW_CIA_DIAG_LOG_ALL); //maybe delete this 
 
+	/* Activate reception immediately. */
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
+
     uint8_t timestamp_buffer[5];
     uint8_t rx_buffer[max_frame_length];
     twr_base_frame_t *rx_frame_pointer;
@@ -209,14 +212,13 @@ int application_twr_pdoa_tag(void)
 	uint8_t your_ID[2]; // expected address of incoming message
 
 
-	printf("Wait 3s before starting...");
+	printf("Wait 3s before starting...\n");
     Sleep(3000);
 
 	while (1)
 	{
 		/* check ranging timeout and restart ranging if necessary  */
 		if (tag_mode && (millis() - last_sync_time) > ranging_timeout) { 
-			//dwt_forcetrxoff();  // make sure receiver is off after a timeout (what to do about this??)
 			printf("Timeout -> reset\n");
 			last_sync_time = millis();
 			state = TWR_ERROR_TAG; 
@@ -453,7 +455,9 @@ int application_twr_pdoa_tag(void)
 					memcpy(your_ID, your_ID_list, 2);
 					device_crt++;
 				} else {
+					// restart the receiver and turn off transmitter
 					dwt_forcetrxoff();
+					dwt_rxenable(DWT_START_RX_IMMEDIATE);
 					last_recieve_time = millis();
 					printf("No devices left: Changing into anchor\n");
 					state = TWR_SYNC_STATE_ANC;
