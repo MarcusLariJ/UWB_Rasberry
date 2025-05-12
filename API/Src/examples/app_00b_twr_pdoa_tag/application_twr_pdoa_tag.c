@@ -481,7 +481,7 @@ int application_twr_pdoa_tag(void)
 		case TWR_ERROR_ANC:
 			printf("Anchor error -> reset\n");
 			state = TWR_SYNC_STATE_ANC;
-			Sleep(100);
+			Sleep(2);
 			dwt_rxenable(DWT_START_RX_IMMEDIATE);
 			break;
 
@@ -756,7 +756,7 @@ int application_twr_pdoa_tag(void)
 			dwt_forcetrxoff();  // make sure receiver is off after an error
 			printf("Tag error -> reset\n");
 			state = TWR_SYNC_STATE_TAG;
-			Sleep(100);
+			Sleep(2);
 		}
 	}
 
