@@ -151,7 +151,8 @@ int application_twr_anchor(void)
     twr_base_frame_t *rx_frame_pointer;
     int16_t sts_quality_index;
 
-	uint8_t tag_ID[2] = { 'A', 'A' }; // set the ID of the tag
+	uint8_t my_ID[2] = { 'A', 'A' }; // set the ID of the tag
+	uint8_t your_ID[2]; // expected address of incoming message
 
 	while (1)
 	{
@@ -185,13 +186,17 @@ int application_twr_anchor(void)
 					continue;
 				}
 
-				if (memcmp(tag_ID, rx_frame_pointer->dst_address, 2) != 0) {
+				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
 					printf("RX ERR: wrong dest address on sync frame\n");
 					state = TWR_ERROR;
 					continue;
 				}
 
 				printf("RX: Sync frame\n");
+
+				/* Set the expected source to that of the incoming messages source, to ignore all other messages*/
+				your_ID[0] = rx_frame_pointer->src_address[0];
+				your_ID[1] = rx_frame_pointer->src_address[1];
 
 				/* Initialize the sequence number for this ranging exchange */
 				next_sequence_number = rx_frame_pointer->sequence_number + 1;
@@ -250,8 +255,14 @@ int application_twr_anchor(void)
 					continue;
 				}
 
-				if (memcmp(tag_ID, rx_frame_pointer->dst_address, 2) != 0) {
+				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
 					printf("RX ERR: wrong dest address on response frame\n");
+					state = TWR_ERROR;
+					continue;
+				}
+				
+				if (memcmp(your_ID, rx_frame_pointer->src_address, 2) != 0) {
+					printf("RX ERR: wrong souce address on response frame\n");
 					state = TWR_ERROR;
 					continue;
 				}

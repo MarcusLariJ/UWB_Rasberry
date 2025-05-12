@@ -162,7 +162,8 @@ int application_twr_pdoa_tag(void)
     /*Get unique chip ID from OTP memory as device identification*/
 	dwt_otpread(CHIPID_ADDR, &device_id, 1);
 	printf("Chip ID: %u\n", device_id);
-	uint8_t tag_ID[2] = { 'T', 'T' }; // set the ID of the tag
+	uint8_t my_ID[2] = { 'T', 'T' }; // set the ID of the tag
+	uint8_t your_ID[2]; // expected address of incoming message
 
 	printf("Wait 3s before starting...");
     Sleep(3000);
@@ -188,6 +189,10 @@ int application_twr_pdoa_tag(void)
 			/* Send sync frame (1/4) */
 			last_sync_time = millis(); // replaced HAL_GetTick() 
 			sync_frame.sequence_number = next_sequence_number++;
+			your_ID[0] = 'A'; // The wanted dest should be set by the communication protocol
+			your_ID[1] = 'A';		
+			sync_frame.dst_address[0] = your_ID[0];
+			sync_frame.dst_address[1] = your_ID[1];
 			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
 			dwt_writetxfctrl(sizeof(sync_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 
@@ -238,8 +243,14 @@ int application_twr_pdoa_tag(void)
 					continue;
 				}
 
-				if (memcmp(tag_ID, rx_frame_pointer->dst_address, 2) != 0) {
+				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
 					printf("RX ERR: wrong dest address on poll frame\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				if (memcmp(your_ID, rx_frame_pointer->src_address, 2) != 0) {
+					printf("RX ERR: wrong source address on poll frame\n");
 					state = TWR_ERROR;
 					continue;
 				}
@@ -315,8 +326,14 @@ int application_twr_pdoa_tag(void)
 					continue;
 				}
 				
-				if (memcmp(tag_ID, rx_frame_pointer->dst_address, 2) != 0) {
+				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
 					printf("RX ERR: wrong dest address on final frame\n");
+					state = TWR_ERROR;
+					continue;
+				}
+
+				if (memcmp(your_ID, rx_frame_pointer->src_address, 2) != 0) {
+					printf("RX ERR: wrong source address on final frame\n");
 					state = TWR_ERROR;
 					continue;
 				}
