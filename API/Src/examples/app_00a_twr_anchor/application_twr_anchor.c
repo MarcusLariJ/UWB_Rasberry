@@ -326,7 +326,7 @@ int application_twr_anchor(void)
 		case TWR_ERROR:
 			printf("Ranging error -> reset\n");
 			state = TWR_SYNC_STATE;
-			Sleep(500);
+			Sleep(200);
 			dwt_rxenable(DWT_START_RX_IMMEDIATE);
 		}
 	}
