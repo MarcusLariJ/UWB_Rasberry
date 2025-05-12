@@ -36,7 +36,7 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data);
 volatile uint8_t rx_done = 0;  /* Flag to indicate a new frame was received from the interrupt */
 volatile uint16_t new_frame_length = 0;
 volatile uint8_t tx_done = 0;
-volatile uint32_t last_recieve_time;
+volatile unsigned int last_recieve_time;
 
 char print_buffer[128];
 
@@ -87,7 +87,7 @@ twr_final_frame_t final_frame = {
 		 * but then we would just discard values and loose accuracy. */
 };
 
-const static size_t max_frame_length = sizeof(twr_final_frame_t) + 2;
+static const size_t max_frame_length = sizeof(twr_final_frame_t) + 2;
 
 uint64_t rx_timestamp_poll = 0;
 uint64_t tx_timestamp_response = 0;
@@ -121,10 +121,10 @@ enum state_t state = TWR_SYNC_STATE_ANC;
 uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
-const static uint64_t round_tx_delay = 10000llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
-const static uint64_t ranging_timeout = 100; // (10 ms) 100 ms
-const static uint64_t avg_tx_timeout = 100; // (5 ms) 100 ms, Should be at least four times that of round_tx_delay 
-uint64_t tx_timeout = 0; // the timeout, before reverting to anchor
+static const uint64_t round_tx_delay = 10000llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
+static const unsigned int ranging_timeout = 100; // (10 ms) 100 ms
+static const unsigned int avg_tx_timeout = 100; // (5 ms) 100 ms, Should be at least four times that of round_tx_delay 
+unsigned int tx_timeout = avg_tx_timeout/2; // the timeout, before reverting to anchor
 
 void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
 
@@ -192,7 +192,7 @@ int application_twr_pdoa_tag(void)
     twr_base_frame_t *rx_frame_pointer;
     twr_final_frame_t *rx_final_frame_pointer;
     int16_t sts_quality_index;
-    uint32_t last_sync_time = millis(); // replaced HAL_GetTick();
+    unsigned int last_sync_time = millis(); // replaced HAL_GetTick();
 	last_recieve_time = millis();
 
     float current_rotation = 0;
@@ -234,13 +234,13 @@ int application_twr_pdoa_tag(void)
 		case TWR_SYNC_STATE_ANC:
 			/* If device is forced to be an anchor only, then never change over to tag */
 			if (!FORCE_ANCHOR){
-				/* Calculate random timeout time, centered around the average*/
-				tx_timeout = avg_tx_timeout/2 + (rand() % avg_tx_timeout);
 				if ((millis() - last_recieve_time) > tx_timeout) {
 					/* If it is time to transmit: */
 					dwt_forcetrxoff();
+					/* Calculate random timeout time, centered around the average*/
+					tx_timeout = avg_tx_timeout/2 + (rand() % avg_tx_timeout);
 					last_sync_time = millis();
-					printf("Time to transmit!");
+					printf("Changing into tag\n");
 					tag_mode = 1;
 					state = TWR_SYNC_STATE_TAG; // We become a tag
 					tx_timestamp_poll = 0;
@@ -665,8 +665,6 @@ int application_twr_pdoa_tag(void)
 
 				/* Transmit human readable for debugging */
 				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_m: %.2f\n", twr_count, ((float)dist_mm)/1000);
-				printf(print_buffer);
-				snprintf(print_buffer, sizeof(print_buffer), "rotation: %u\n", current_rotation);
 				printf(print_buffer);
 
 				/* Rotate receiver */
