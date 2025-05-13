@@ -1,8 +1,9 @@
 from models_functions import *
+import robot_sim as rsim
 import matplotlib.pyplot as plt
 import matplotlib.patches as patch
 import numpy as np
-from scipy.stats.distributions import chi2
+
 
 def setup_plot(x=[0, 10], y=[0,7], figsize=(10,7)) -> tuple[plt.Figure, plt.Axes]:
     fig, ax = plt.subplots(figsize=figsize)
@@ -123,41 +124,73 @@ def plot_innovation(ax: plt.Axes, inno: np.ndarray, var: float, dt=1, color='blu
 def plot_NEES(ax: plt.Axes, 
               x_est: np.ndarray, 
               x_true: np.ndarray, 
-              P: np.ndarray, 
-              prob=0.95, dt=1, 
+              P: np.ndarray,
+              rad_sel: np.ndarray, 
+              prob=0.95, 
+              dt=1, 
               color='blue'):
     """
     Plots the NEES (Normalized Estimation Error Squared), and plots it along with the confidence bounds
     For a consistent system, the results should be equal to the degrees of freedom of the system/length of state vector
     """
-    x = x_true - x_est
-    x_len = x.shape[0]
-    x_num = x.shape[1]
-    P_num = P.shape[2]
-    nees = np.zeros(x_num)
-    a = 1-prob
-    if x_num == P_num:
-        t = np.linspace(0, x_num*dt, x_num)
-        check_inv = True
-        for i in range(x_num):
-            if check_inv:
-                # Initially, the P matrix is not invertible (fx all 0s). 
-                # Make a check just in case for the first few cases:
-                if np.linalg.det(P[:,:,i]) == 0:
-                    nees[i] = -1
-                    continue
-                else:
-                    check_inv = False 
-            nees[i] = x[:,i:i+1].T @ np.linalg.inv(P[:,:,i]) @ x[:,i:i+1]
-        # Calculate thresholds:
-        r1 = chi2.ppf(a/2.0, df=x_len)
-        r2 = chi2.ppf(1-a/2.0, df=x_len)
-        r1_line = np.ones_like(nees)*r1
-        r2_line = np.ones_like(nees)*r2
-        # Plot anees
-        ax.plot(t, nees, color=color)
-        ax.plot(t, r1_line, color=color, linestyle='--')
-        ax.plot(t, r2_line, color=color, linestyle='--')
-    else:
-        print("Number of x did not match number of P")
+    nees, t, r1, r2 = rsim.NEES(x_est=x_est, x_true=x_true, P=P, rad_sel=rad_sel, prob=prob, dt=dt)
+    r1_line = np.ones_like(nees)*r1
+    r2_line = np.ones_like(nees)*r2
+    # Plot anees
+    ax.plot(t, nees, color=color)
+    ax.plot(t, r1_line, color=color, linestyle='--')
+    ax.plot(t, r2_line, color=color, linestyle='--')
     
+def plot_ANEES(ax: plt.Axes, 
+              x_est: np.ndarray, 
+              x_true: np.ndarray, 
+              P: np.ndarray,
+              rad_sel: np.ndarray, 
+              prob=0.95, 
+              dt=1, 
+              color='blue'):
+    """
+    Plots the NEES (Normalized Estimation Error Squared), and plots it along with the confidence bounds
+    For a consistent system, the results should be equal to the degrees of freedom of the system/length of state vector
+    """
+    anees, t, r1, r2 = rsim.ANEES(x_est=x_est, x_true=x_true, P=P, rad_sel=rad_sel, prob=prob, dt=dt)
+    r1_line = np.ones_like(anees)*r1
+    r2_line = np.ones_like(anees)*r2
+    # Plot anees
+    ax.plot(t, anees, color=color)
+    ax.plot(t, r1_line, color=color, linestyle='--')
+    ax.plot(t, r2_line, color=color, linestyle='--')
+
+def plot_RMSE(ax: plt.Axes,
+              x_est: np.ndarray,
+              x_true: np.ndarray,
+              biases: np.ndarray = None,
+              dt=1):
+    """
+    Plot the RMSE for position states and biases
+    """
+    if biases == None:
+        state_indx = [0,2,3]
+        x_true2 = x_true
+        rad_sel = np.array([[True], [False], [False]])
+    else:
+        state_indx = [0,2,3,8,9,10]
+        x_true2 = np.append(x_true, biases, axis=0)
+        rad_sel = np.array([[True], [False], [False], [False], [False], [False]])
+    x_est2 = x_est[state_indx]
+
+    rmse = rsim.RMSE(x_true2, x_est2, rad_sel)
+    x_num = rmse.shape[1]
+    t = np.linspace(0, x_num*dt, x_num)
+
+    # Plot states:
+    ax.plot(t, rmse[0])
+    ax.plot(t, np.linalg.norm(rmse[1:3], axis=0))
+    if biases == None:
+        ax.legend(['Theta', 'Position'])
+    else: 
+        ax.plot(t, rmse[3])
+        ax.plot(t, rmse[4])
+        ax.plot(t, rmse[5])
+        ax.legend(['theta', 'x position', 'y position', 'Angular rate bias', 'x acc bias', 'y acc bias'])
+

@@ -48,11 +48,10 @@ def wrappingPi(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Difference of vector
     """
-    n, nx = x.shape
     if x.size:
         return ((x - y + np.pi) % (2*np.pi)) - np.pi
     else:
-        return np.zeros(shape=(n, nx), dtype=x.dtype)
+        return np.zeros_like(x)
 
 def subtractState(s0x: np.ndarray, s1x: np.ndarray, rad_sel: np.ndarray) -> np.ndarray:
     # Handle states with radians as units

@@ -3,8 +3,10 @@ import models_functions as mf
 import traj 
 import numpy as np
 import robot_plotter as rp
+from scipy.stats.distributions import chi2
 
 # Module that features different robot models
+# and error metrics
 
 class Anchor:
     def __init__(self, x0: np.ndarray,
@@ -142,6 +144,9 @@ class Robot_single:
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
+
+        # TODO: update logs of other robots
+
         return inno
 
 
@@ -269,7 +274,8 @@ class robot_luft(Robot_single):
         Update own values after a succesfull measurement
         """
         mf.recieve_meas(self.mot, idj, xnew, Pnew, self.id_list, self.s_list, self.id_num)
-    
+        # TODO: log new updated values here!
+
     def send_requested(self, idj):
         """
         Send requested values, when initially making a measurement
@@ -280,11 +286,86 @@ class robot_luft(Robot_single):
         ti = self.t
         return xi, Pii, sigmaij, idi, ti
 
-def MSE_pos(x_true, x_predicted):
+
+
+########### Error functions ###############
+
+
+def RMSE(x_true, x_predicted, rad_sel):
     """
     Calculate the mean squared error for orientation and position
     """
-    # Extract theta, pos from full state:
-    x_predicted2 = x_predicted[[mf.X_THETA, mf.X_P.start, mf.X_P.start+1],:]
-    MSE = np.mean(np.square(x_true - x_predicted2), axis=1)
-    return MSE
+    x_len = x_predicted.shape[0]
+    x_num = x_predicted.shape[1]
+    N = x_predicted.shape[2]
+    rmse = np.zeros((x_len, x_num))
+    #square and sum
+    for i in range(N):
+        rmse += mf.subtractState(x_true, x_predicted[:,:,i], np.repeat(rad_sel, x_num, axis=1))**2
+    # normlize and root
+    rmse = np.sqrt(1/N*rmse)    
+    return rmse
+
+def NEES(x_est: np.ndarray, 
+        x_true: np.ndarray, 
+        P: np.ndarray, 
+        rad_sel: np.ndarray, 
+        prob=0.95, 
+        dt=1):
+    """
+    Calculate the NEES (normalized estimation error squared) over time
+    """
+    x_len = x_est.shape[0]
+    x_num = x_est.shape[1]
+    P_num = P.shape[2]
+    x = mf.subtractState(x_true, x_est, np.repeat(rad_sel, x_num, axis=1))
+    nees = np.zeros(x_num)
+    a = 1-prob
+    if x_num == P_num:
+        t = np.linspace(0, x_num*dt, x_num)
+        check_inv = True
+        for i in range(x_num):
+            if check_inv:
+                # Initially, the P matrix is not invertible (fx all 0s). 
+                # Make a check just in case for the first few cases:
+                if np.linalg.det(P[:,:,i]) == 0:
+                    nees[i] = -1
+                    continue
+                else:
+                    check_inv = False 
+            nees[i] = x[:,i:i+1].T @ np.linalg.inv(P[:,:,i]) @ x[:,i:i+1]
+        # Calculate thresholds:
+        r1 = chi2.ppf(a/2.0, df=x_len)
+        r2 = chi2.ppf(1-a/2.0, df=x_len)
+
+        return nees, t, r1, r2
+    else:
+        print("Number of x did not match number of P")
+        return -1, -1, -1, -1
+    
+def ANEES(x_est: np.ndarray, 
+        x_true: np.ndarray, 
+        P: np.ndarray,
+        rad_sel, 
+        prob=0.95, 
+        dt=1, ):
+    """
+    Calculate ANEES
+    """
+    x_len = x_est.shape[0]
+    x_num = x_est.shape[1]
+    N = x_est.shape[2] # number of independent samples
+    anees = np.zeros(x_num)
+    a = 1-prob
+    for i in range(N):
+        # Add all nees up together:
+        temp, t, _, _ = NEES(x_est[:,:,i], x_true, P[:,:,:,i], rad_sel=rad_sel, prob=prob, dt=dt)
+        anees += temp
+    anees = 1/N*anees
+    # Calculate thresholds:
+    r1 = 1/N*chi2.ppf(a/2.0, df=N*x_len)
+    r2 = 1/N*chi2.ppf(1-a/2.0, df=N*x_len)
+
+    return anees, t, r1, r2
+
+    
