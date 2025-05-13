@@ -533,6 +533,7 @@ float getAngle(){
     // simple reads the angle from the encoder and returns it as a float
     uint16_t cmd_NOP = 0;
     uint16_t cmd_getAngle = (0x3fff | 0x4000) | 0x8000; // 1 parity (for even), 1 for read, read angle at addresss 0x3fff
+    uint16_t cmd_clear = 0x4001;
 
     read_encoder(cmd_getAngle);
     delay(20);
@@ -542,6 +543,8 @@ float getAngle(){
     {
         printf("alarm bits on\n");
         printf("%d\n", alarmbits);
+        // clear the error:
+        read_encoder(cmd_clear);
     }
     // Convert to angle:
     return((float)(output & 0x3fff) * (360.0 / 0x4000));

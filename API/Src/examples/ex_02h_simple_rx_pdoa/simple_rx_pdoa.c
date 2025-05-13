@@ -72,7 +72,7 @@ int simple_rx_pdoa(void)
     /* Reset DW IC */
     reset_DWIC(); /* Target specific drive of RSTn line into DW IC low for a period. */
 
-    Sleep(2); // Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC
+    Sleep(20); // Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC
 
     while (!dwt_checkidlerc()) /* Need to make sure DW IC is in IDLE_RC before proceeding */
     { };
@@ -111,11 +111,11 @@ int simple_rx_pdoa(void)
     float current_rotation = 0;
     while (1)
     {
-        if (last_pdoa_val!=pdoa_val)
+        if (last_pdoa_val != pdoa_val)
         {
             current_rotation = getAngle();
             last_pdoa_val=pdoa_val;
-            float pdoa_read = ((float)last_pdoa_val / (1 << 11));
+            float pdoa_read = ((float)last_pdoa_val / (1 << 11))*180.0/3.1415926535;
             sprintf((char *)&pdoa_message_data,"PDOA val = %f, current rot = %f", pdoa_read, current_rotation);
             test_run_info((unsigned char *)&pdoa_message_data);
             csv_write_rx(pdoa_read, -1, current_rotation);

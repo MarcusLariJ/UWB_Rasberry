@@ -62,13 +62,7 @@ twr_base_frame_t response_frame = {
 
 const static size_t max_frame_length = sizeof(twr_final_frame_t) + 2;
 
-const static uint64_t round_tx_delay = 100lu*1000llu*US_TO_DWT_TIME;  // reply time (10ms)
-
-//#define ROTATE  /* Define to rotate the receiver */
-#ifdef ROTATE
-#define TWR_COUNT_PER_ANGLE 5
-#define ROTATION_WRAP 1  /* Define to rotate continuously and not to 360 and back */
-#endif
+const static uint64_t round_tx_delay = 700llu*US_TO_DWT_TIME;  // reply time (0.9ms)
 
 uint64_t rx_timestamp_poll = 0;
 uint64_t tx_timestamp_response = 0;
@@ -172,13 +166,6 @@ int application_twr_pdoa_tag(void)
 	printf("Wait 3s before starting...");
     Sleep(3000);
 
-#ifdef ROTATE
-	snprintf(print_buffer, sizeof(print_buffer), "Config: twr/angle: %u\n", TWR_COUNT_PER_ANGLE);
-#else
-	snprintf(print_buffer, sizeof(print_buffer), "Config: twr/angle: -\n");
-#endif
-	printf(print_buffer);
-
 	while (1)
 	{
 		/* check timeout and restart ranging if necessary (if there is an overflow in the tick counter the difference
@@ -254,15 +241,6 @@ int application_twr_pdoa_tag(void)
 
 				dwt_readrxtimestamp(timestamp_buffer);
 				rx_timestamp_poll = decode_40bit_timestamp(timestamp_buffer);
-
-				/* Marker for serial output parsing script*/
-				snprintf(print_buffer, sizeof(print_buffer), "New Frame: poll: %u\n", next_sequence_number);
-				printf(print_buffer);
-
-				/* Transmit measurement data */
-				current_rotation = getAngle();
-				transmit_rx_diagnostics(current_rotation);
-				//transmit_cir();
 
 				/* Accept frame and continue ranging */
 				next_sequence_number++;
@@ -342,7 +320,6 @@ int application_twr_pdoa_tag(void)
 				/* Transmit measurement data */
 				current_rotation = getAngle();
 				transmit_rx_diagnostics(current_rotation);
-				//transmit_cir();
 
 				/* Accept frame continue with ranging */
 				next_sequence_number++;
@@ -367,11 +344,8 @@ int application_twr_pdoa_tag(void)
 				const uint32_t dist_mm = (uint32_t)(tprop_ns*299.792458);  // usint c = 299.7... mm/ns
 
 				/* Transmit TWR round and reply times and ranging estimate */
-				static_assert(sizeof(meas_twr_t) == 40);
-				printf("BLOB / twr / v2 / 40\n");
-				meas_twr_t raning_blob = { Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation };
-				//stdio_write_binary((uint8_t*)&raning_blob, 40);
-				//stdio_write("\n");
+				//static_assert(sizeof(meas_twr_t) == 40);
+				//meas_twr_t raning_blob = { Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation };
 				csv_write_twr(Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
 
 				/* Transmit human readable for debugging */
@@ -382,39 +356,14 @@ int application_twr_pdoa_tag(void)
 
 				/* Rotate receiver */
 				twr_count++;
-#ifdef ROTATE
-				if (twr_count % TWR_COUNT_PER_ANGLE == 0) {
-#ifdef ROTATION_WRAP
-					/* Rotate continuously */
-					if (current_rotation > 0 && current_rotation % 360 == 0) {
-						full_rotation_count++;
-					}
-					current_rotation += rotation_direction;
-#else
-					/* Rotate to 360 degrees and back to zero */
-					if (current_rotation == 0) {
-						rotation_direction = 1;
-						current_rotation++;
-					} else if (current_rotation == 360) {
-						rotation_direction = -1;
-						current_rotation--;
-						full_rotation_count++;
-					} else {
-						current_rotation += rotation_direction;
-					}
-#endif
-					rotate_reciever(rotation_direction);
-				} else {
-					Sleep(10);
-				}
-#else
-				Sleep(5);
-#endif
 
 				/* Begin next ranging exchange */
 				tx_done = 0;
 				rx_done = 0;
 				state = TWR_SYNC_STATE;
+
+				// Short sleep, after succesful communication
+				//Sleep(200);
 			}
 			break;
 		case TWR_ERROR:
