@@ -459,7 +459,8 @@ def _KF_ml(x: np.ndarray,
        R: np.ndarray, 
        ys: np.ndarray,
        ypred: np.ndarray,
-       radian_sel: np.ndarray):
+       radian_sel: np.ndarray,
+       thres=0):
     """
     Computes the Kalman gain and updates the states and covariance.
     Includes the ML step
@@ -473,7 +474,14 @@ def _KF_ml(x: np.ndarray,
     S = H @ P @ np.transpose(H) + R
     # Run ML step:
     r_sel = radian_sel
-    y, _ = ML_rb_gen(ys, ypred, S, r_sel)
+    y, ml = ML_rb_gen(ys, ypred, S, r_sel)
+    # filter out unlikely measurements
+    if ml < thres:
+        print("Measurement rejected: Ml of " + str(ml))
+        inno_dummy = np.zeros((ys.shape[0],1))
+        K_dummy = np.zeros((x.shape[0], ys.shape[0]))
+        return x, P, inno_dummy, K_dummy 
+
     # Then carry on with the Kalman Filter
     inno = subtractState(y, ypred, r_sel)
     # Compute gain:
@@ -514,7 +522,8 @@ def KF_rb(moti: MotionModel,
             xj: MotionModel, 
             measi: MeasModel,
             tj: np.ndarray, 
-            ys: np.ndarray) -> np.ndarray:
+            ys: np.ndarray,
+            thres=0) -> np.ndarray:
     """
     KF for and range/bearing measurement between robot i and anchor j
     Assumes no uncertainty about state vector of j!
@@ -535,7 +544,7 @@ def KF_rb(moti: MotionModel,
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
     ypred = measi.h_rb(xi, xj, tj)
     radian_sel = measi.radian_sel[:Z_W]
-    xnew, Pnew, inno, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel, thres=thres)
     moti.x = xnew
     moti.P = Pnew
 
@@ -545,7 +554,8 @@ def KF_rb_ext(moti: MotionModel,
             motj: MotionModel, 
             measi: MeasModel,
             tj: np.ndarray, 
-            ys: np.ndarray) -> np.ndarray:
+            ys: np.ndarray,
+            thres=0) -> np.ndarray:
     """
     KF for and range/bearing measurement between robot i and j,
     that takes both noise sources into account.
@@ -572,7 +582,7 @@ def KF_rb_ext(moti: MotionModel,
     radian_sel = measi.radian_sel[:Z_W]
     # Append both state vectors to get x:
     x = np.append(xi, xj, axis=0)
-    xnew, Pnew, inno, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel, thres=thres)
     moti.x = xnew[:STATE_LEN,:] # Update xi
     motj.x = xnew[STATE_LEN:,:] # Update xj
     moti.P = Pnew[:STATE_LEN, :STATE_LEN] # Update Pii
@@ -584,7 +594,8 @@ def KF_full(moti: MotionModel,
             motj: MotionModel, 
             measi: MeasModel,
             measj: MeasModel, 
-            ys: np.ndarray) -> np.ndarray:
+            ys: np.ndarray,
+            thres=0) -> np.ndarray:
     """
     KF for both IMU for robot i and range/bearing measurement between robot i and j
     Args:
@@ -605,7 +616,7 @@ def KF_full(moti: MotionModel,
     R = measi.R
     ypred = measi.h_full(xi, xj, tj)
     radian_sel = measi.radian_sel
-    xnew, Pnew, inno, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel, thres=thres)
     moti.x = xnew
     moti.P = Pnew
 
@@ -685,7 +696,8 @@ def KF_rb_rom(moti: MotionModel,
             tj: np.ndarray, 
             ys: np.ndarray,
             cor_list: np.ndarray,
-            cor_num: int) -> np.ndarray:
+            cor_num: int,
+            thres=0) -> np.ndarray:
     """
     KF for and range/bearing measurement between robot i and anchor j
     Assumes no uncertainty about state vector of j!
@@ -702,7 +714,7 @@ def KF_rb_rom(moti: MotionModel,
         H (np.ndarray):
     """
     # Run normal KF robot to anchor measurement
-    inno, K, H = KF_rb(moti, xj, measi, tj, ys)
+    inno, K, H = KF_rb(moti, xj, measi, tj, ys, thres=thres)
     # Then update correlations
     rom_private(K, H, cor_list, cor_num)
 
@@ -718,7 +730,8 @@ def _KF_relative_decen(moti: MotionModel,
             ys: np.ndarray,
             id_list: dict,
             cor_list: np.ndarray,
-            cor_num: int):
+            cor_num: int,
+            thres=0):
     # First, check if we have made a measurement to this robot before:
     if idj not in id_list.keys():
         print("Adding new robot: " + str(idj))
@@ -748,7 +761,7 @@ def _KF_relative_decen(moti: MotionModel,
     ypred = measi.h_rb(moti.x, xj, tj)
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing
     rad_sel = measi.radian_sel[:Z_W]
-    xnew, Pnew, inno, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel)
+    xnew, Pnew, inno, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel, thres=thres)
     #print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
     # Now, split up the results:
     moti.x = xnew[:STATE_LEN, 0:1]
@@ -770,7 +783,8 @@ def KF_relative_luft(moti: MotionModel,
             ys: np.ndarray,
             id_list: dict,
             cor_list: np.ndarray,
-            cor_num: int):
+            cor_num: int,
+            thres=0):
     """
     Luft et als algorithm, that approximates inter-robot correlations for non-participating robots
     Args:
@@ -802,7 +816,8 @@ def KF_relative_luft(moti: MotionModel,
                                                                         ys, 
                                                                         id_list, 
                                                                         cor_list, 
-                                                                        cor_num)
+                                                                        cor_num,
+                                                                        thres=thres)
     # Finally, approximate inter-robot correlations
     luft_relative(Pii_new, Pii, idj, id_list, cor_list)
     #TODO: check if id_list and cor_list gets updated correctly
@@ -935,7 +950,7 @@ def _pdf_meas(S: np.ndarray,
     Returns:
         prob (float): Probability of measurement
     """
-    prob = (1/2*np.pi)*(1/np.sqrt(np.linalg.det(S))) * np.exp(-(1/2)*np.transpose(inno) @ np.linalg.inv(S) @ inno)
+    prob = (1/2*np.pi)*(1/np.sqrt(np.linalg.det(S))) * np.exp(-(1/2)*inno.T @ np.linalg.inv(S) @ inno)
     
     return prob
 
@@ -987,11 +1002,6 @@ def ML_rb_gen(ys,
     More general form. Reuses S, zpred calculated for Kalman filtering
     """
     ylen = ys.shape[1]
-    if ylen == 1:
-        # if there is only one measurement, then just return
-        ml = -1
-        return ys, ml
-    # Otherwise carry on
     i_final = -1
     ml = -1
     for i in range(ylen):

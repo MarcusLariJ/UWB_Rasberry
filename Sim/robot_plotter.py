@@ -140,6 +140,7 @@ def plot_NEES(ax: plt.Axes,
     ax.plot(t, nees, color=color)
     ax.plot(t, r1_line, color=color, linestyle='--')
     ax.plot(t, r2_line, color=color, linestyle='--')
+    ax.set_ylim([0, r2+1])
     
 def plot_ANEES(ax: plt.Axes, 
               x_est: np.ndarray, 
@@ -160,6 +161,7 @@ def plot_ANEES(ax: plt.Axes,
     ax.plot(t, anees, color=color)
     ax.plot(t, r1_line, color=color, linestyle='--')
     ax.plot(t, r2_line, color=color, linestyle='--')
+    ax.set_ylim([0, r2+1])
 
 def plot_RMSE(ax: plt.Axes,
               x_est: np.ndarray,
@@ -169,13 +171,13 @@ def plot_RMSE(ax: plt.Axes,
     """
     Plot the RMSE for position states and biases
     """
-    if biases == None:
+    if biases is None:
         state_indx = [0,2,3]
         x_true2 = x_true
         rad_sel = np.array([[True], [False], [False]])
     else:
         state_indx = [0,2,3,8,9,10]
-        x_true2 = np.append(x_true, biases, axis=0)
+        x_true2 = np.append(x_true, np.repeat(biases, x_true.shape[1], axis=1), axis=0)
         rad_sel = np.array([[True], [False], [False], [False], [False], [False]])
     x_est2 = x_est[state_indx]
 
@@ -186,11 +188,11 @@ def plot_RMSE(ax: plt.Axes,
     # Plot states:
     ax.plot(t, rmse[0])
     ax.plot(t, np.linalg.norm(rmse[1:3], axis=0))
-    if biases == None:
+    if biases is None:
         ax.legend(['Theta', 'Position'])
     else: 
         ax.plot(t, rmse[3])
         ax.plot(t, rmse[4])
         ax.plot(t, rmse[5])
-        ax.legend(['theta', 'x position', 'y position', 'Angular rate bias', 'x acc bias', 'y acc bias'])
+        ax.legend(['theta', 'Position', 'Angular rate bias', 'x acc bias', 'y acc bias'])
 

@@ -146,6 +146,8 @@ class Robot_single:
         self.P_log[:,:,self.p_i] = self.P
 
         # TODO: update logs of other robots
+        r.x_log[:,r.p_i:r.p_i+1] = r.x
+        r.P_log[:,:,r.p_i] = r.P
 
         return inno
 
@@ -197,7 +199,7 @@ class robot_luft(Robot_single):
 
         return inno
     
-    def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0):
+    def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0, thres=0):
         """
         Make measurement to anchor and use Rom methods for updating correlations
         """
@@ -211,7 +213,7 @@ class robot_luft(Robot_single):
                            sr=sr,
                            sb=sb)
         
-        inno, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num)
+        inno, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
         # Log updated quantities:        
@@ -219,7 +221,7 @@ class robot_luft(Robot_single):
         self.P_log[:,:,self.p_i] = self.P
         return inno
     
-    def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0):
+    def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0):
         """
         Implements Lufts et al algorithm for CL localization
         """
@@ -245,7 +247,8 @@ class robot_luft(Robot_single):
                                                                 ys, 
                                                                 self.id_list,
                                                                 self.s_list,
-                                                                self.id_num)
+                                                                self.id_num,
+                                                                thres=thres)
         self.id_num = cor_num
         # send updated quantities back to j
         r.recieve_update(xj_new, Pjj_new, self.id)
@@ -275,6 +278,8 @@ class robot_luft(Robot_single):
         """
         mf.recieve_meas(self.mot, idj, xnew, Pnew, self.id_list, self.s_list, self.id_num)
         # TODO: log new updated values here!
+        self.x_log[:,self.p_i:self.p_i+1] = self.x
+        self.P_log[:,:,self.p_i] = self.P
 
     def send_requested(self, idj):
         """
