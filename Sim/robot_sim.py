@@ -33,7 +33,7 @@ class Anchor:
     def draw_position(self, ax, color = 'b'):
         # Qucikly plot the position (without covariance matrix)
         temp = np.concatenate((self.x[mf.X_THETA:mf.X_THETA+1,:], self.x[mf.X_P,:]), axis=0)
-        rp.plot_position(ax, temp, color=color)
+        rp.plot_position(ax, temp, color=color, draw_arrow=False, marker='x')
 
 class Robot_single:
     def __init__(self, x0: np.ndarray,

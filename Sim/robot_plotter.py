@@ -19,7 +19,7 @@ def setup_plot(x=[0, 10], y=[0,7], figsize=(10,7)) -> tuple[plt.Figure, plt.Axes
 
     return fig, ax
 
-def plot_variance_ellipse(ax: plt.Axes, P, x, color):
+def plot_variance_ellipse(ax: plt.Axes, P, x, color, linestyle):
     """
     Draw ellipse from covariance matrix.
     Args:
@@ -45,11 +45,12 @@ def plot_variance_ellipse(ax: plt.Axes, P, x, color):
                             height=2*np.sqrt(lam2), 
                             angle=theta,
                             facecolor='none',
-                            edgecolor=color)
+                            edgecolor=color,
+                            linestyle=linestyle)
 
     ax.add_patch(ellipse)
 
-def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b'):
+def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b', draw_arrow=True, marker=',', linestyle='-'):
     """
     Args:
         ax (plt.Axes): The ax of the main figure
@@ -61,13 +62,21 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b'):
     px = x[1,:]
     py = x[2,:]
 
-    ax.plot(px, py, color=color)
+    ax.plot(px, py, color=color, marker=marker, linestyle=linestyle)
     ax.scatter(px, py, c=color, s=1.5)
-    for i in range(len):
-        ax.arrow(px[i], py[i], d*np.cos(theta[i]), d*np.sin(theta[i]), color=color, head_width=0.05, length_includes_head=True)
-    return 
+    if draw_arrow:
+        for i in range(len):
+            ax.arrow(px[i], 
+                     py[i], 
+                     d*np.cos(theta[i]), 
+                     d*np.sin(theta[i]), 
+                     color=color, 
+                     head_width=0.05, 
+                     length_includes_head=True, 
+                     linestyle=linestyle)
+        return 
 
-def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b'):
+def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b', draw_arrow=True, marker=',', linestyle='-'):
     """
     Extended version of position plotting. Includes covariance ellipse.
     The function handles extracting the relevant expectations and covariances for x, y.
@@ -78,9 +87,15 @@ def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b'):
     """
     pos = x[X_P, :]
     Pxy = P[X_P, X_P, :]
-    plot_position(ax, np.concatenate((x[X_THETA:X_THETA+1,:], x[X_P,:]),axis=0), color)
-    for i in range(P.shape[2]):
-        plot_variance_ellipse(ax, Pxy[:,:,i], pos[:,i], color=color)
+    plot_position(ax, np.concatenate((x[X_THETA:X_THETA+1,:], 
+                                      x[X_P,:]),axis=0), 
+                                      color, 
+                                      draw_arrow=draw_arrow, 
+                                      marker=marker,
+                                      linestyle=linestyle)
+    if P is not None:
+        for i in range(P.shape[2]):
+            plot_variance_ellipse(ax, Pxy[:,:,i], pos[:,i], color=color, linestyle=linestyle)
 
 def plot_measurement(ax: plt.Axes, xi: np.ndarray, xj: np.ndarray):
     """
