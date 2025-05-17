@@ -199,7 +199,7 @@ class robot_luft(Robot_single):
 
         return inno
     
-    def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0, thres=0):
+    def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0, thres=0, max_dist=-1):
         """
         Make measurement to anchor and use Rom methods for updating correlations
         """
@@ -213,6 +213,10 @@ class robot_luft(Robot_single):
                            sr=sr,
                            sb=sb)
         
+        if (max_dist > -1 and ys[1,0] > max_dist):
+            print("Anchor out of range for robot " + str(self.id))
+            return None
+        # Else: anchor within range:
         inno, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
@@ -221,7 +225,7 @@ class robot_luft(Robot_single):
         self.P_log[:,:,self.p_i] = self.P
         return inno
     
-    def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0):
+    def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1):
         """
         Implements Lufts et al algorithm for CL localization
         """
@@ -234,6 +238,10 @@ class robot_luft(Robot_single):
                            r.t,
                            sr=sr,
                            sb=sb)
+        if (max_dist > -1 and ys[1,0] > max_dist):
+            print("Robot " + str(r.id) + " out of range for robot " + str(self.id))
+            return None
+        # Else: robot within range:
         # Request quantities from other robot:
         xj, Pjj, sigmaji, idj, tj = r.send_requested(self.id)
         # KF update

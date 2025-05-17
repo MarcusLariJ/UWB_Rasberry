@@ -8,60 +8,58 @@ def anc_setup1():
     """
         Anchors in each corner of the arena
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[-0.7854],[0],[0.1],[6.9]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[2.3562],[0],[9.9],[0.1]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[1],[69]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[0],[0],[99],[1]])
     return xanc1, xanc2
 
 def anc_setup2():
     """
         Anchor in the other corners of the arena
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[-0.7854],[0],[0.1],[0.1]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[2.3562],[0],[9.9],[6.9]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[1],[1]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[0],[0],[99],[69]])
     return xanc1, xanc2
 
 def anc_setup3():
     """
         Anchors clumped close together    
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[-0.7854],[0],[0.1],[6.5]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[2.3562],[0],[0.5],[6.9]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[1],[65]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[0],[0],[5],[69]])
     return xanc1, xanc2
 
 def anc_setup4():
     """
         Anchors in the middle
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[-0.7854],[0],[4.5],[3.5]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[2.3562],[0],[5.5],[3.5]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[45],[35]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[0],[0],[55],[35]])
     return xanc1, xanc2
 
 ########### different trajectories pre-defined ##############
 
 # All running over 10 minutes
 # Slow trajectories
-# Runs two rounds
 # waits 30 seconds before lift-off
 def path1_slow(dt=1):
     """
     Slow trajectory 1
     Runs for 10 minutes
     Runs all over map
-    Two rounds
     """
     # still
-    x0 = np.zeros((mf.STATE_LEN, 1)); x0[:6] = np.array([[-1.57],[0],[0.5],[5],[0],[0]])
+    x0 = np.zeros((mf.STATE_LEN, 1)); x0[:6] = np.array([[-1.57],[0],[5],[50],[0],[0]])
     
     # Moving
-    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[6],[6.5],[0.05],[0]])
-    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[-1.57],[0],[9.5],[4],[0],[-0.05]])
-    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[0],[0],[8],[1],[-0.05],[0]])
-    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[3.14],[0],[2],[3],[0.05],[0.05]])
-    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[1.57],[0],[9],[5],[0],[-0.05]])
-    xg = np.zeros((mf.STATE_LEN, 1)); xg[:6] = np.array([[0],[0],[9],[1],[-0.05],[0]])
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[60],[65],[0.5],[0]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[-1.57],[0],[95],[4],[0],[0]])
+    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[0],[0],[80],[10],[-0.5],[0]])
+    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[3.14],[0],[20],[30],[0.5],[0.5]])
+    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[1.57],[0],[90],[50],[0],[-0.5]])
+    xg = np.zeros((mf.STATE_LEN, 1)); xg[:6] = np.array([[0],[0],[90],[10],[0],[0]])
 
-    pos, y_IMU = traj.gen_poly_traj_multi(pos=[x0, x0, xb, xc, xd, xe, xf, xg, x0, xb, xc, xd, xe, xf, xg], 
-                                          time=[0, 30, 60, 90, 120, 180, 240, 300, 330, 360, 390, 420, 480, 540, 600], dt=dt)
+    pos, y_IMU = traj.gen_poly_traj_multi(pos=[x0, x0, xb, xc, xd, xe, xf, xg], 
+                                          time=[0, 30, 120, 200, 260, 380, 500, 630], dt=dt)
 
     return pos, y_IMU, x0
 
@@ -71,6 +69,151 @@ def path2_slow(dt=1):
     Runs for 10 minutes
     Runs all over map
     Two rounds
+    """
+    # Stay still here
+    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[0],[0],[5],[30],[0],[0]])
+    # Then move
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[3.14],[0],[70],[50],[0],[0.5]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[4.71],[0],[30],[50],[-0.5],[-0.5]])
+    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[4.71],[0],[30],[5],[0.5],[0]])
+    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[3.14],[0],[80],[40],[0],[0.5]])
+    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[1.57],[0],[5],[40],[0],[-0.25]])
+
+    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd, xe, xf], 
+                                          time=[0, 30, 150, 200, 280, 430, 630], dt=dt)
+
+    return pos, y_IMU, xa
+
+def path3_slow(dt=1):
+    """
+    Slow trajectory 3
+    Runs for 10 minutes
+    Runs all over map
+    Two rounds
+    """
+    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[-1.57],[0],[10],[60],[0],[0]])
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[20],[5],[0.5],[0]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[1.57],[0],[80],[20],[0],[0.5]])
+    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[3.14],[0],[85],[60],[0],[0]])
+    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[3.14],[0],[50],[40],[-0.5],[0]])
+    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[1.57],[0],[40],[50],[0],[0.05]])
+    xg = np.zeros((mf.STATE_LEN, 1)); xg[:6] = np.array([[0],[0],[15],[60],[0],[-0.5]])
+    xh = np.zeros((mf.STATE_LEN, 1)); xh[:6] = np.array([[-1.57],[0],[5],[5],[-0.5],[0]])
+
+    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd, xe, xf, xg, xh], 
+                                          time=[0, 30, 140, 220, 280, 360, 400, 480, 630], dt=dt)
+
+    return pos, y_IMU, xa
+
+def path4_slow(dt=1):
+    """
+    Slow trajectory 4
+    Runs for 10 minutes
+    Runs all over map
+    """
+    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[1.57],[0],[5],[10],[0],[0]])
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[60],[15],[0],[-0.5]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[-1.57],[0],[95],[30],[0],[0.5]])
+    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[-1.57],[0],[80],[65],[-0.5],[0]])
+    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[-3.14],[0],[60],[25],[0],[-0.5]])
+    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[-1.57],[0],[5],[25],[0],[0.5]])
+    xg = np.zeros((mf.STATE_LEN, 1)); xg[:6] = np.array([[0],[0],[20],[60],[0.5],[0]])
+
+    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd, xe, xf, xg], 
+                                          time=[0, 30, 180, 240, 340, 440, 540, 630], dt=dt)
+
+    return pos, y_IMU, xa
+
+def path5_slow(dt=1):
+    """
+    Slow trajectory 5
+    Runs for 10 minutes
+    Runs all over map
+    """
+    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[3.14],[0],[95],[5],[0],[0]])
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[1.57],[0],[25],[25],[0],[0.25]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[-1.57],[0],[85],[40],[0.5],[0]])
+    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[-1.57],[0],[90],[60],[-0.5],[0]])
+    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[-3.14],[0],[40],[65],[-0.5],[0]])
+    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[-1.57],[0],[30],[20],[0.5],[0]])
+
+    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd, xe, xf], 
+                                          time=[0, 30, 300, 420, 480, 550, 630], dt=dt)
+
+    return pos, y_IMU, xa
+
+def path6_slow(dt=1):
+    """
+    Slow trajectory 6
+    Runs for 10 minutes
+    Runs all over map
+    """
+    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[1.57],[0],[80],[5],[0],[0]])
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[5],[35],[0],[0.25]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[-1.57],[0],[50],[65],[0.25],[0]])
+    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[-3.14],[0],[75],[20],[0],[-0.25]])
+
+    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd], 
+                                          time=[0, 30, 260, 460, 630], dt=dt)
+
+    return pos, y_IMU, xa
+
+# Fast tracetories
+# Multiple rounds
+# waits 30 seconds before lift-off
+
+def path1_fast(dt=1):
+    """
+    Fast trajectory 1
+    Swirly pattern
+    """
+    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[0],[0],[0.5],[5],[0],[0]])
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[3.14],[0],[4],[6.5],[0.5],[0]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[0],[0],[9.5],[5],[0],[1.0]])
+    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[-3.14],[0],[1],[2],[0],[1.0]])
+    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[0],[0],[9],[2],[0],[0.5]])
+
+    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xe, xf, xa], 
+                                          time=[0, 30, 40, 50, 60, 70, 80, 90], dt=dt)
+
+    return pos, y_IMU, xa
+
+def path2_fast(dt=1):
+    """
+    Fast trajectory 1
+    Start and stop
+    """
+    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[0],[0],[5],[0.5],[0],[0]])
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[1.57],[0],[5],[6.5],[0],[0]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[3.14],[0],[1],[4],[0],[0]])
+    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[1.57],[0],[9],[4],[0],[0]])
+
+    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xe, xa], 
+                                          time=[0, 30, 40, 50, 60, 70, 85, 90], dt=dt)
+
+    return pos, y_IMU, xa
+
+def path4_fast(dt=1):
+    """
+    This is just path1_slow modified, so it runs faster
+    """
+    # Stay still here
+    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[0],[0],[0.5],[3],[0],[0]])
+    # Then move
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[3.14],[0],[7],[5],[0],[0.05]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[4.71],[0],[3],[5],[-0.05],[-0.05]])
+    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[4.71],[0],[3],[0.5],[0.05],[0]])
+    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[3.14],[0],[8],[4],[0],[0.05]])
+    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[1.57],[0],[0.5],[4],[0],[-0.05]])
+
+    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd, xe, xf], 
+                                          time=[0, 30, 15, 20, 25, 40, 60], dt=dt)
+
+    return pos, y_IMU, xa
+
+def path5_fast(dt=1):
+    """
+    This is just path2_slow modified, so it runs faster
     """
     # Stay still here
     xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[0],[0],[0.5],[3],[0],[0]])
@@ -86,12 +229,9 @@ def path2_slow(dt=1):
 
     return pos, y_IMU, xa
 
-def path3_slow(dt=1):
+def path6_fast(dt=1):
     """
-    Slow trajectory 3
-    Runs for 10 minutes
-    Runs all over map
-    Two rounds
+    This is just path3_slow modified, so it runs faster
     """
     xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[-1.57],[0],[1],[6],[0],[0]])
     xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[2],[0.5],[0.05],[0]])
@@ -107,65 +247,6 @@ def path3_slow(dt=1):
 
     return pos, y_IMU, xa
 
-def path4_slow(dt=1):
-    """
-    Slow trajectory 4
-    Runs for 10 minutes
-    Runs all over map
-    """
-    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[1.57],[0],[0.5],[1],[0],[0]])
-    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[6],[1.5],[0],[-0.05]])
-    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[-1.57],[0],[9.5],[3],[0],[0.05]])
-    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[-1.57],[0],[8],[6.5],[-0.05],[0]])
-    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[-3.14],[0],[6],[2.5],[0],[-0.05]])
-    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[-1.57],[0],[0.5],[2.5],[0],[0.05]])
-    xg = np.zeros((mf.STATE_LEN, 1)); xg[:6] = np.array([[0],[0],[2],[6],[0.05],[0]])
-
-    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd, xe, xf, xg, xa, xb, xc, xd, xe, xf, xg], 
-                                          time=[0, 30, 90, 120, 170, 220, 270, 300, 330, 390, 420, 470, 520, 570, 600], dt=dt)
-
-    return pos, y_IMU, xa
-
-def path5_slow(dt=1):
-    """
-    Slow trajectory 5
-    Runs for 10 minutes
-    Runs all over map
-    2 rounds
-    """
-    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[3.14],[0],[9.5],[0.5],[0],[0]])
-    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[1.57],[0],[2.5],[2.5],[0],[0.05]])
-    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[-1.57],[0],[8.5],[4],[0.05],[0]])
-    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[-1.57],[0],[9],[6],[-0.05],[0]])
-    xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[-3.14],[0],[4],[6.5],[-0.05],[0]])
-    xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[-1.57],[0],[3],[2],[0.05],[0]])
-
-    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd, xe, xf, xa, xb, xc, xd, xe, xf], 
-                                          time=[0, 30, 150, 210, 240, 275, 300, 330, 450, 510, 540, 575, 600], dt=dt)
-
-    return pos, y_IMU, xa
-
-def path6_slow(dt=1):
-    """
-    Slow trajectory 6
-    Runs for 10 minutes
-    Runs all over map
-    Two rounds
-    """
-    xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[1.57],[0],[8],[0.5],[0],[0]])
-    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[0.5],[3.5],[0],[0.05]])
-    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[-1.57],[0],[5],[6.5],[0.05],[0]])
-    xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[-3.14],[0],[7.5],[2],[0],[-0.05]])
-
-    pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd, xa, xb, xc, xd], 
-                                          time=[0, 30, 130, 230, 300, 330, 430, 530, 600], dt=dt)
-
-    return pos, y_IMU, xa
-
-# Fast tracetories
-# Multiple rounds
-# waits 30 seconds before lift-off
-
 ########### Functions to handle updates ##############
 
 def updateAllLuft(robot: rsim.robot_luft, 
@@ -173,16 +254,17 @@ def updateAllLuft(robot: rsim.robot_luft,
                    ax = None,
                    sr=0,
                    sb=0,
-                   thres=0):
+                   thres=0,
+                   max_dist=-1):
     """
         Perform a measurements to all other robots
     """
     inno_anc = []
     inno_rob = []
     for a in anchor:
-        inno_anc += [robot.anchor_meas(a, ax, sr, sb, thres)]
+        inno_anc += [robot.anchor_meas(a, ax, sr, sb, thres, max_dist)]
     for r in rob_other:
-        inno_rob += [robot.robot_meas_luft(r, ax, sr, sb, thres)]
+        inno_rob += [robot.robot_meas_luft(r, ax, sr, sb, thres, max_dist)]
     
     return inno_anc, inno_rob
 

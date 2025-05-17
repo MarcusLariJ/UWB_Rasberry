@@ -5,7 +5,7 @@ import matplotlib.patches as patch
 import numpy as np
 
 
-def setup_plot(x=[0, 10], y=[0,7], figsize=(10,7)) -> tuple[plt.Figure, plt.Axes]:
+def setup_plot(x=[0, 100], y=[0,70], figsize=(10,7)) -> tuple[plt.Figure, plt.Axes]:
     fig, ax = plt.subplots(figsize=figsize)
     ax.set_title("Robot trajectory")
     ax.set_xlabel("x [m]")
@@ -14,8 +14,8 @@ def setup_plot(x=[0, 10], y=[0,7], figsize=(10,7)) -> tuple[plt.Figure, plt.Axes
     ax.set_ylim((y[0],y[1]))
     ax.grid()
     ax.tick_params(direction='in')
-    ax.set_xticks(np.arange(x[0], x[1]+1, 1))
-    ax.set_yticks(np.arange(y[0]+1, y[1]+1, 1))
+    ax.set_xticks(np.arange(x[0], x[1]+1, 10))
+    ax.set_yticks(np.arange(y[0]+10, y[1]+1, 10))
 
     return fig, ax
 
@@ -56,7 +56,7 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b', draw_arrow=True, mar
         ax (plt.Axes): The ax of the main figure
         x (np.ndarray): The state to plot (given as theta, px, py)
     """
-    d = 0.25
+    d = 2.0
     len = x.shape[1]
     theta = x[0,:]
     px = x[1,:]
@@ -71,7 +71,7 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b', draw_arrow=True, mar
                      d*np.cos(theta[i]), 
                      d*np.sin(theta[i]), 
                      color=color, 
-                     head_width=0.05, 
+                     head_width=0.5, 
                      length_includes_head=True, 
                      linestyle=linestyle)
         return 
