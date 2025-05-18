@@ -5,6 +5,7 @@ import models_functions as mf
 # and other ways to generate measurement data
 
 def gen_circ_traj(R, N, dt=1, theta0=0, xc=0, yc=0, ccw = False):
+    # TODO: delete
     # Angle values for each position
     theta = np.linspace(0 + theta0, 2 * np.pi + theta0, N)
     if (ccw):
@@ -46,6 +47,7 @@ def gen_circ_traj(R, N, dt=1, theta0=0, xc=0, yc=0, ccw = False):
     return trajectory, IMU_meas, x0
 
 def gen_circ_traj_norot(R, N, dt=1, theta0=0, xc=0, yc=0, ccw = False):
+    # TODO: delete
     # Angle values for each position
     theta = np.linspace(0 + theta0, 2 * np.pi + theta0, N)
     if (ccw):
@@ -175,23 +177,31 @@ def gen_poly_traj_multi(pos: list, time: list, dt):
         IMU_meas = np.append(IMU_meas[:,:-1], imu[i+1], axis=1)
     return trajectory, IMU_meas
 
-def gen_noise(y: np.ndarray, bias: np.ndarray = None, sigma: np.ndarray = None, dt: float = 1.0):
+def gen_noise(y: np.ndarray, bias: np.ndarray = None, sigma: np.ndarray = None, out_freq: np.ndarray = None, dt: float = 1.0):
     """
     Applies noise to the passed measurement
     Args:
         y (np.ndarray): The measurement(s) y_size X y_len 
         bias (np.ndarray): A vector of biases y_size X 1
         sigma (np.ndarray): Covariance matrix y_size X y_size
+        out_freq (np.ndarray): How many outliers there are pr second on average. Requires noise is present. Vector of size y_size X 1 
         dt (float): Sampling time
     """
     y_size, y_len = y.shape
+    if not (sigma is None):
+        # Convert variance to std deviation
+        noise_v = np.sqrt(sigma) @ np.random.randn(y_size, y_len)
+        if not (out_freq is None):
+            # Add outliers to the dataset
+            out_num = np.round(out_freq*dt*y_len).astype(int) # get total number of outlier (this is deterministic - might want to randomize this a bit)
+            for i in range(y_size):
+                outlier_indices = np.random.choice(y_len, size=out_num[i,0], replace=False)
+                # Multiply chosen outlier positions with 5, to increase noise to 5 std:
+                noise_v[i, outlier_indices] = noise_v[i, outlier_indices]*5
+        y += noise_v  
     if not (bias is None):
         bias_v = np.repeat(bias, y_len, axis=1)
         y += bias_v
-    if not (sigma is None):
-        # Convert variance to std deviation
-        noise_v = np.sqrt(sigma/dt) @ np.random.randn(y_size, y_len)
-        y += noise_v
     return y
 
 def gen_rb(thetai, thetaj, posi, posj, ti, tj):
@@ -207,7 +217,8 @@ def gen_rb(thetai, thetaj, posi, posj, ti, tj):
 
     return z
 
-def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0):
+def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=0):
+    # TODO: look this function through, make sure it operates correct
     """
     Generate range/bearing measurement with front/back ambiguity.
     This is supposed to be used with the ML before being send to the 
@@ -224,11 +235,20 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0):
     # apply noise
     if not (sr==0):
         r_noise = np.sqrt(sr)*np.random.randn()
+        if not (pout_r==0) and np.random.rand() < pout_r:
+            # If the returned unifrom probability is smaller than the threshold, generate an outlier:
+            r_noise*5
+            print("Range outlier generated") # debug
         r += r_noise
     if not (sb==0):
         b_noise = np.sqrt(sb)*np.random.randn()
+        if not (pout_b==0) and np.random.rand() < pout_b:
+            # If the returned unifrom probability is smaller than the threshold, generate an outlier:
+            b_noise*5
+            print("Bearing outlier generated") # debug
         ys[0,0] += b_noise
         ys[0,1] -= b_noise
+    r = max(r,0) # ranges cannot be smaller than 0
     ys[1,0] = r
     ys[1,1] = r
     return ys

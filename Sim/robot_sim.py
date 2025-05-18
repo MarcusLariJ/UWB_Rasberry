@@ -327,6 +327,7 @@ def NEES(x_est: np.ndarray,
         dt=1):
     """
     Calculate the NEES (normalized estimation error squared) over time
+    TODO: NEES of bearing acts strange at times, make sure that it is calculated correct 
     """
     x_len = x_est.shape[0]
     x_num = x_est.shape[1]
