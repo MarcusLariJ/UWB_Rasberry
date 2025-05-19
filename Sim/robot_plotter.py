@@ -46,7 +46,8 @@ def plot_variance_ellipse(ax: plt.Axes, P, x, color, linestyle):
                             angle=theta,
                             facecolor='none',
                             edgecolor=color,
-                            linestyle=linestyle)
+                            linestyle=linestyle,
+                            alpha = 0.5)
 
     ax.add_patch(ellipse)
 

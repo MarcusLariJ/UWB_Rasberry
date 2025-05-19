@@ -473,7 +473,7 @@ def _KF_ml(x: np.ndarray,
        thres=0):
     """
     Computes the Kalman gain and updates the states and covariance.
-    Includes the ML step
+    Includes the ML (now MD) step
     Args: 
         x (np.ndarray): States to update
         P (np.ndarray): Process noise to update
@@ -482,12 +482,14 @@ def _KF_ml(x: np.ndarray,
         radian_sel (np.ndarray): Array indicating which states are given in radians
     """
     S = H @ P @ np.transpose(H) + R
+    Sinv = np.linalg.inv(S)
     # Run ML step:
     r_sel = radian_sel
-    y, ml = ML_rb_gen(ys, ypred, S, r_sel)
+    #y, ml = ML_rb_gen(ys, ypred, S, r_sel)
+    y, md = MD_rb_gen(ys, ypred, Sinv, r_sel)
     # filter out unlikely measurements
-    if ml < thres:
-        print("Measurement rejected: Ml of " + str(ml))
+    if thres > 0 and md > thres:
+        print("Measurement rejected: MD of " + str(md))
         inno_dummy = np.zeros((ys.shape[0],1))
         K_dummy = np.zeros((x.shape[0], ys.shape[0]))
         return x, P, inno_dummy, K_dummy 
@@ -495,7 +497,7 @@ def _KF_ml(x: np.ndarray,
     # Then carry on with the Kalman Filter
     inno = subtractState(y, ypred, r_sel)
     # Compute gain:
-    K = P @ np.transpose(H) @ np.linalg.inv(S)
+    K = P @ np.transpose(H) @ Sinv
     # Update state estimate
     xnew = x + K @ inno 
     # Update covariance (with Joseph form):
@@ -947,7 +949,7 @@ def gen_IMU_meas(pos: np.ndarray,
     
 
 
-#### ML estimators ####
+#### ML and MD estimators ####
 
 def _pdf_meas(S: np.ndarray,
         inno: np.ndarray):
@@ -963,6 +965,21 @@ def _pdf_meas(S: np.ndarray,
     prob = (1/2*np.pi)*(1/np.sqrt(np.linalg.det(S))) * np.exp(-(1/2)*inno.T @ np.linalg.inv(S) @ inno)
     
     return prob
+
+def _MD_meas(Sinv: np.ndarray,
+             inno: np.ndarray):
+    """
+    Calculate the Mahalanobis distance
+    Args:
+        Sinv (np.ndarray): The S matrix already inverted
+        inno (np.ndarray): Difference between y and ypred
+    returns:
+        md (float): The Mahalanobis distance
+    """
+
+    md = inno.T @ Sinv @ inno
+
+    return md
 
 def ML_rb(ys: np.ndarray, 
                moti: MotionModel, 
@@ -1031,3 +1048,32 @@ def ML_rb_gen(ys,
     z = ys[:,i_final:i_final+1]
 
     return z, ml
+
+def MD_rb_gen(ys,
+            zpred,
+            Sinv, 
+            rad_sel):
+    """
+    Uses MD to find the most likely range/bearing, based on the prediction 
+    from the motion model.
+    More general form. Reuses Sinv, zpred calculated for Kalman filtering
+    """
+    ylen = ys.shape[1]
+    i_final = -1
+    for i in range(ylen):
+        inno = subtractState(ys[:,i:i+1], zpred, rad_sel)
+        # Calculate MD
+        md = _MD_meas(Sinv, inno)
+        if i==0:
+            md_min = md
+            i_final = 0
+        elif md < md_min:
+            md_min = md
+            i_final = i
+    # Debug: Notify us when wrong measurement is used:
+    if not i_final == 0:
+        print("Wrong measurement used!! Bearing: " + str(ys[0,i_final]) + " was used instead of: " + str(ys[0,0]))
+    # Use the most likely bearing for final measurement
+    z = ys[:,i_final:i_final+1]
+
+    return z, md_min
