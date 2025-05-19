@@ -70,7 +70,9 @@ def subtractState(s0x: np.ndarray, s1x: np.ndarray, rad_sel: np.ndarray) -> np.n
 class MeasModel:
     """ Base measurement model class
     """
-    def __init__(self, t = np.array([[0],[0]]), R = np.diag([0.1]*MEAS_LEN)):
+    def __init__(self, 
+                 t: np.ndarray = np.array([[0],[0]]), 
+                 R: np.ndarray = np.diag([0.0009, 0.001, 0.0002, 0.004, 0.004])):
         """"
         Inits the measurement model
         Args:
@@ -314,15 +316,23 @@ class MotionModel:
     """
     def __init__(self, dt: float = 1.0,  
                 x0: np.ndarray = np.zeros((STATE_LEN, 1)),
-                P: np.ndarray = np.zeros((STATE_LEN, STATE_LEN)),
-                Q = np.diag([0.5]*INPUT_LEN)     ):
+                P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
+                Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 0.000001, 0.00001, 0.00001])):
         """"
         Inits the measurement model
         Args:
             dt float: time difference between k
-            P (np.ndarray): Process noise
+            P (np.ndarray): State covariance
+            Q (np.ndarray): Process noise covariance
         """
-
+        # Initial uncertainty:
+        # +-90 on orientation
+        # +-8 degrees pr second
+        # +- 5 m uncertainty on position
+        # +- 1 m/s on velocity
+        # +- 0.6 m/s^2 on acceleration
+        # +- 1.7 deg/s on rate bias 
+        # +- 0.95 m/s^2 on acc bias 
         self._P = P
         self._Q = Q
         self._dt = dt

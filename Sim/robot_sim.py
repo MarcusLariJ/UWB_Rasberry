@@ -59,6 +59,7 @@ class Robot_single:
         self.x_log[:,0:1] = x0
         self.P_log = np.zeros((mf.STATE_LEN, mf.STATE_LEN, self.p_len)) # keeps a record of all covariances
         self.P_log[:,:,0] = P
+        self.dt = dt
 
         self.mot = mf.MotionModel(x0 = x0, dt=dt, P=P, Q=Q)
         self.meas = mf.MeasModel(t=t, R=R)
@@ -213,10 +214,11 @@ class robot_luft(Robot_single):
                            sr=sr,
                            sb=sb)
         
-        if (max_dist > -1 and ys[1,0] > max_dist):
-            print("Anchor out of range for robot " + str(self.id))
+        if (max_dist > 0 and ys[1,0] > max_dist):
+            print("Anchor out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: anchor within range:
+        print("Robot " + str(self.id) + " sees an anchor" + " at time " + str(self.p_i*self.dt))
         inno, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
@@ -238,10 +240,11 @@ class robot_luft(Robot_single):
                            r.t,
                            sr=sr,
                            sb=sb)
-        if (max_dist > -1 and ys[1,0] > max_dist):
-            print("Robot " + str(r.id) + " out of range for robot " + str(self.id))
+        if (max_dist > 0 and ys[1,0] > max_dist):
+            print("Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: robot within range:
+        print("Robot " + str(self.id) + " sees robot " + str(r.id) + " at time " + str(self.p_i*self.dt))
         # Request quantities from other robot:
         xj, Pjj, sigmaji, idj, tj = r.send_requested(self.id)
         # KF update
