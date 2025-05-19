@@ -76,7 +76,7 @@ class Robot_single:
     def t(self) -> np.ndarray:
         return self.meas.t
 
-    def predict(self, imu_correct = True):
+    def predict(self, imu_correct = True, thres=0):
         """
         Predict one timestep
         """
@@ -85,7 +85,7 @@ class Robot_single:
             self.mot.predict()
             self.mot.propagate()
             if imu_correct:
-                inno, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1])
+                inno, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], thres=thres)
 
             self.p_i += 1 
 
@@ -178,7 +178,7 @@ class robot_luft(Robot_single):
         self.id_list = {}
         self.s_list = np.zeros((mf.STATE_LEN, mf.STATE_LEN, self.id_len)) # list for interrobot correleations (sigmaij)
 
-    def predict(self, imu_correct=True):
+    def predict(self, imu_correct=True, thres=0):
         """
         Predict one timestep
         """
@@ -187,7 +187,7 @@ class robot_luft(Robot_single):
             self.mot.predict()
             self.mot.propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
             if imu_correct:
-                inno, _= mf.KF_IMU_rom(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num)
+                inno, _= mf.KF_IMU_rom(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
 
             self.p_i += 1 
 

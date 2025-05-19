@@ -470,7 +470,7 @@ def _KF_ml(x: np.ndarray,
        ys: np.ndarray,
        ypred: np.ndarray,
        radian_sel: np.ndarray,
-       thres=0):
+       thres: float = 0):
     """
     Computes the Kalman gain and updates the states and covariance.
     Includes the ML (now MD) step
@@ -506,7 +506,7 @@ def _KF_ml(x: np.ndarray,
     # Return new values:
     return xnew, Pnew, inno, K
 
-def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
+def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray, thres: float = 0) -> np.ndarray:
     """
     Simple KF for when IMU measurements come in
     Args:
@@ -524,7 +524,7 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray) -> np.ndarray:
     R = meas.R[Z_W:,Z_W:] # Only use noise related to IMU
     ypred = meas.h_IMU(x)
     radian_sel = meas.radian_sel[Z_W:]
-    xnew, Pnew, inno, K = _KF(x, P, H, R, y, ypred, radian_sel)
+    xnew, Pnew, inno, K = _KF_ml(x, P, H, R, y, ypred, radian_sel, thres=thres) # only for filtering outliers TODO: not very efficient 
     mot.x = xnew
     mot.P = Pnew
 
@@ -620,6 +620,7 @@ def KF_full(moti: MotionModel,
         inno (np.ndarray): Innovation
         K (np.ndarray): Kalman gain vector
     """
+    # TODO: delete
     xi = moti.x
     xj = motj.x
     tj = measj.t
@@ -683,7 +684,8 @@ def KF_IMU_rom(mot: MotionModel,
                meas: MeasModel, 
                y: np.ndarray,
                cor_list: np.ndarray,
-               cor_num: int) -> np.ndarray:
+               cor_num: int,
+               thres: float = 0) -> np.ndarray:
     """
     KF for when IMU measurements come in. 
     Also updates all inter-robot correlations 
@@ -696,7 +698,7 @@ def KF_IMU_rom(mot: MotionModel,
         K (np.ndarray): Kalman gain vector
     """
     # Run normal KF IMU 
-    inno, K, H = KF_IMU(mot, meas, y)
+    inno, K, H = KF_IMU(mot, meas, y, thres=thres)
     # Update correlations between robots
     rom_private(K, H, cor_list, cor_num)
 
@@ -898,56 +900,6 @@ def request_meas(mot: MotionModel,
         sigmaij = cor_list[:,:,idx]
     
     return xi, Pii, sigmaij, cor_num
-
-#### Fake measurements ####
-
-
-def gen_IMU_meas(pos: np.ndarray,
-                dt,
-                sigma: np.ndarray = np.diag([0]*IMU_LEN), 
-                bias: np.ndarray = np.zeros((IMU_LEN,1))) -> np.ndarray:
-    """
-    From a sequence of poses, this function generates a sequence of IMU measurements
-    TODO: Maybe pad output meas a bit out with zeros
-    TODO: Delete
-    Args:
-        pos (np.ndarray): Array of positions. Dimension = 3 X MEAS_NUM
-        sigma (np.ndarray): Noise power. Dimension = IMU_LEN X IMU_LEN
-        bias (np.ndarray): Constant measurement bias to apply. Dimension = IMU_LEN X 1
-        dt: Time difference
-    returns:
-        meas (np.ndarray): Generated IMU measurements
-        x0 (np.ndarray): Starting conditions of posistion, velocity and acceleration 
-    """
-    x0 = np.zeros((STATE_LEN, 1))
-    x0[X_THETA] = pos[0,0]
-    x0[X_P] = pos[1:,0:1]
-
-    # First, find first derivative:
-    v_diff = np.diff(pos, axis=1)*(1/dt)
-    x0[X_W] = v_diff[0,0]
-    x0[X_V] = v_diff[1:,0:1]
-
-    # Then next derivative:
-    a_diff = np.diff(v_diff, axis=1)*(1/dt)
-    x0[X_A] = a_diff[1:,0:1]
-    a_diff[0,:] = v_diff[0,:-1] # The angle is only of 1st order
-    meas_len, meas_num = a_diff.shape
-    
-    # Convert to body acceleration:
-    for i in range(meas_num):
-        a_diff[1:,i] = RM(-pos[0,i]) @ a_diff[1:,i]
-
-    # Random noise: TODO: is this applied correctly?
-    noise = (sigma*dt) @ np.random.rand(IMU_LEN, meas_num)
-    # Bias:
-    bias_m = np.repeat(bias, meas_num, axis=1)
-    # Combine noise and bias:
-    meas = a_diff + noise + bias_m
-
-    return meas, x0
-    
-
 
 #### ML and MD estimators ####
 
