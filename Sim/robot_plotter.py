@@ -22,32 +22,32 @@ def setup_plot(x=[0, 100], y=[0,70], figsize=(10,7)) -> tuple[plt.Figure, plt.Ax
 def plot_variance_ellipse(ax: plt.Axes, P, x, color, linestyle):
     """
     Draw ellipse from covariance matrix.
+    # Code from matplotlib.org
     Args:
         ax (plt.Axes): The ax of the main figure
         P: Covariance matrix between x and y
         x: Position x and y
     """
-    a = P[0,0]
-    b = P[0,1]
-    c = P[1,1]
-
-    lam1 = (a + c)/2 + np.sqrt(((a-c)/2)**2 + b**2)
-    lam2 = (a + c)/2 - np.sqrt(((a-c)/2)**2 + b**2)
-    if (b == 0 and a >= c):
-        theta = 0
-    elif (b == 0 and a < c):
-        theta = np.pi/2
-    else:
-        theta = np.arctan2(lam1-a, b)*(180/np.pi)
-    
-    ellipse = patch.Ellipse(xy=(x[0], x[1]), 
-                            width=2*np.sqrt(lam1), 
-                            height=2*np.sqrt(lam2), 
-                            angle=theta,
+    pearson = P[0, 1]/np.sqrt(P[0, 0] * P[1, 1])
+    ell_radius_x = np.sqrt(1 + pearson)
+    ell_radius_y = np.sqrt(1 - pearson)
+    ellipse = patch.Ellipse((0, 0), 
+                            width=ell_radius_x * 2, 
+                            height=ell_radius_y * 2,
                             facecolor='none',
                             edgecolor=color,
                             linestyle=linestyle,
-                            alpha = 0.5)
+                            alpha=0.7)
+
+    scale_x = np.sqrt(P[0, 0]) * 3 # three standard deviations
+    scale_y = np.sqrt(P[1, 1]) * 3
+
+    transf = patch.transforms.Affine2D() \
+        .rotate_deg(45) \
+        .scale(scale_x, scale_y) \
+        .translate(x[0], x[1])
+
+    ellipse.set_transform(transf + ax.transData)
 
     ax.add_patch(ellipse)
 

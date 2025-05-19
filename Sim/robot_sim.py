@@ -40,9 +40,9 @@ class Robot_single:
                  path: np.ndarray, 
                  imu: np.ndarray,
                  dt: float = 1.0,
-                 P: np.ndarray = np.zeros((mf.STATE_LEN, mf.STATE_LEN)),
-                 Q: np.ndarray = np.diag([0.5]*mf.INPUT_LEN),
-                 R: np.ndarray = np.diag([0.1]*mf.MEAS_LEN),
+                 P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
+                 Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 0.000001, 0.00001, 0.00001]),
+                 R: np.ndarray = np.diag([0.0009, 0.001, 0.0002, 0.004, 0.004]),
                  t: np.ndarray = np.array([[0],[0]])
                  ):
         """"
@@ -159,9 +159,9 @@ class robot_luft(Robot_single):
                  imu: np.ndarray,
                  id: int,
                  dt: float = 1.0,
-                 P: np.ndarray = np.zeros((mf.STATE_LEN, mf.STATE_LEN)),
-                 Q: np.ndarray = np.diag([0.5]*mf.INPUT_LEN),
-                 R: np.ndarray = np.diag([0.1]*mf.MEAS_LEN),
+                 P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
+                 Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 0.000001, 0.00001, 0.00001]),
+                 R: np.ndarray = np.diag([0.0009, 0.001, 0.0002, 0.004, 0.004]),
                  t: np.ndarray = np.array([[0],[0]])
                  ):
         """"
