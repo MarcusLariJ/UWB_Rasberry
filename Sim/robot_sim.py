@@ -60,7 +60,8 @@ class Robot_single:
         self.P_log = np.zeros((mf.STATE_LEN, mf.STATE_LEN, self.p_len)) # keeps a record of all covariances
         self.P_log[:,:,0] = P
         self.dt = dt
-        self.nis_IMU = np.zeros(self.p_len) # Keeps all recoreded NIS values
+        self.nis_IMU = np.zeros(self.p_len) # Keeps all recoreded IMU NIS values
+        self.nis_rb = np.zeros(0) # Keeps all recorded RB NIS
 
         self.mot = mf.MotionModel(x0 = x0, dt=dt, P=P, Q=Q)
         self.meas = mf.MeasModel(t=t, R=R)
@@ -223,13 +224,14 @@ class robot_luft(Robot_single):
             return None
         # Else: anchor within range:
         print("Robot " + str(self.id) + " sees an anchor" + " at time " + str(self.p_i*self.dt))
-        inno, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
+        nis, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
-        return inno
+        np.append(self.nis_rb, nis)
+        return nis
     
     def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1):
         """
@@ -252,7 +254,7 @@ class robot_luft(Robot_single):
         # Request quantities from other robot:
         xj, Pjj, sigmaji, idj, tj = r.send_requested(self.id)
         # KF update
-        xj_new, Pjj_new, cor_num, inno, _ = mf.KF_relative_luft(self.mot, 
+        xj_new, Pjj_new, cor_num, nis, _ = mf.KF_relative_luft(self.mot, 
                                                                 self.meas, 
                                                                 idj, 
                                                                 xj,
@@ -273,7 +275,8 @@ class robot_luft(Robot_single):
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
-        return inno
+        np.append(self.nis_rb, nis)
+        return nis
 
     def robot_meas_rom(self, raa: 'robot_luft', rbb: list, ax = None, sr=0, sb=0):
         """

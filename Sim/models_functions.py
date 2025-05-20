@@ -728,11 +728,11 @@ def KF_rb_rom(moti: MotionModel,
         H (np.ndarray):
     """
     # Run normal KF robot to anchor measurement
-    inno, K, H = KF_rb(moti, xj, measi, tj, ys, thres=thres)
+    nis, K, H = KF_rb(moti, xj, measi, tj, ys, thres=thres)
     # Then update correlations
     rom_private(K, H, cor_list, cor_num)
 
-    return inno, K
+    return nis, K
 
 def _KF_relative_decen(moti: MotionModel,  
             measi: MeasModel,
@@ -775,7 +775,7 @@ def _KF_relative_decen(moti: MotionModel,
     ypred = measi.h_rb(moti.x, xj, tj)
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing
     rad_sel = measi.radian_sel[:Z_W]
-    xnew, Pnew, inno, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel, thres=thres)
+    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel, thres=thres)
     #print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
     # Now, split up the results:
     moti.x = xnew[:STATE_LEN, 0:1]
@@ -785,7 +785,7 @@ def _KF_relative_decen(moti: MotionModel,
     Pij_new = Pnew[:STATE_LEN, STATE_LEN:]
     moti.P = Pii_new
     cor_list[:,:,idx] = Pij_new # update the ij correlation
-    return xj_new, Pii_new, Pii, Pjj_new, cor_num, inno, K
+    return xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K
 
 def KF_relative_luft(moti: MotionModel,  
             measi: MeasModel,
@@ -820,7 +820,7 @@ def KF_relative_luft(moti: MotionModel,
         K (np.ndarray): Kalman gain vector
     """
     # first, perform the first part of the algorithm:
-    xj_new, Pii_new, Pii, Pjj_new, cor_num, inno, K = _KF_relative_decen(moti, 
+    xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K = _KF_relative_decen(moti, 
                                                                         measi, 
                                                                         idj, 
                                                                         xj, 
@@ -836,7 +836,7 @@ def KF_relative_luft(moti: MotionModel,
     luft_relative(Pii_new, Pii, idj, id_list, cor_list)
     #TODO: check if id_list and cor_list gets updated correctly
     # xj_new and Pjj_new should be transmitted to the other robot
-    return xj_new, Pjj_new, cor_num, inno, K 
+    return xj_new, Pjj_new, cor_num, nis, K 
 
 def KF_relative_rom(moti: MotionModel,  
             measi: MeasModel,
