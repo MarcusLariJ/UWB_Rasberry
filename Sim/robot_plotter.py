@@ -51,7 +51,7 @@ def plot_variance_ellipse(ax: plt.Axes, P, x, color, linestyle):
 
     ax.add_patch(ellipse)
 
-def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b', draw_arrow=True, marker=',', linestyle='-'):
+def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b', draw_arrow=True, marker=',', linestyle='-', label=None):
     """
     Args:
         ax (plt.Axes): The ax of the main figure
@@ -63,7 +63,7 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b', draw_arrow=True, mar
     px = x[1,:]
     py = x[2,:]
 
-    ax.plot(px, py, color=color, marker=marker, linestyle=linestyle)
+    ax.plot(px, py, color=color, marker=marker, linestyle=linestyle, label=label)
     ax.scatter(px, py, c=color, s=1.5)
     if draw_arrow:
         for i in range(len):
@@ -77,7 +77,7 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b', draw_arrow=True, mar
                      linestyle=linestyle)
         return 
 
-def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b', draw_arrow=True, marker=',', linestyle='-'):
+def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b', draw_arrow=True, marker=',', linestyle='-', label=None):
     """
     Extended version of position plotting. Includes covariance ellipse.
     The function handles extracting the relevant expectations and covariances for x, y.
@@ -93,7 +93,8 @@ def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b', draw
                                       color, 
                                       draw_arrow=draw_arrow, 
                                       marker=marker,
-                                      linestyle=linestyle)
+                                      linestyle=linestyle,
+                                      label=label)
     if P is not None:
         for i in range(P.shape[2]):
             plot_variance_ellipse(ax, Pxy[:,:,i], pos[:,i], color=color, linestyle=linestyle)
@@ -165,7 +166,9 @@ def plot_ANEES(ax: plt.Axes,
               rad_sel: np.ndarray, 
               prob=0.95, 
               dt=1, 
-              color='blue'):
+              color='blue',
+              thres_c='blue',
+              label='anees'):
     """
     Plots the NEES (Normalized Estimation Error Squared), and plots it along with the confidence bounds
     For a consistent system, the results should be equal to the degrees of freedom of the system/length of state vector
@@ -174,10 +177,82 @@ def plot_ANEES(ax: plt.Axes,
     r1_line = np.ones_like(anees)*r1
     r2_line = np.ones_like(anees)*r2
     # Plot anees
-    ax.plot(t, anees, color=color)
-    ax.plot(t, r1_line, color=color, linestyle='--')
-    ax.plot(t, r2_line, color=color, linestyle='--')
-    ax.set_ylim([0, r2+1])
+    ax.semilogy(t, anees, color=color, label=label)
+    ax.semilogy(t, r1_line, color=thres_c, linestyle='--')
+    ax.semilogy(t, r2_line, color=thres_c, linestyle='--')
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("ANEES")
+    ax.grid()
+    ax.tick_params(direction='in')
+    ax.set_xlim([0,t[-1]])
+
+def plot_ANIS(ax: plt.Axes,
+              nis,
+              df,
+              dt=1,
+              prob = 95,
+              color='blue',
+              thres_c='blue',
+              label='anis'):
+    """
+    Plots the ANIS (Average Normalized innovation squared)
+    """
+    anis, t, r1, r2 = rsim.ANIS(nis, df, dt, prob)
+    r1_line = np.ones_like(anis)*r1
+    r2_line = np.ones_like(anis)*r2
+    # Plot anees
+    ax.semilogy(t, anis, color=color, label=label)
+    ax.semilogy(t, r1_line, color=thres_c, linestyle='--')
+    ax.semilogy(t, r2_line, color=thres_c, linestyle='--')
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("ANIS")
+    ax.grid()
+    ax.tick_params(direction='in')
+    ax.set_xlim([0,t[-1]])
+
+def plot_abs_avg(ax, 
+                 abs_e, 
+                 dt=1, 
+                 pos=True, 
+                 colors = ['black', 'blue', 'red'],
+                 labels = ['orientation', 'position']):
+    """
+    Plots the average absolute error of position or biases
+    Assumes ax has a shape of at least 2!
+    Set pos to false to plot bias erros
+    Only use the output of the bp wrapper!
+    """
+    if ax.size < 2:
+        raise ValueError("ax too short. Should be at least 2")
+    
+    x_num = abs_e.shape[1]
+    N = abs_e.shape[2]
+    # first, get the average error:
+    avg_e = 1.0/N*np.sum(abs_e, axis=2)
+    t = np.linspace(0, x_num*dt, x_num)
+    
+    if pos:
+        # Plot the positioning error:
+        pos_norm = np.linalg.norm(avg_e[1:3,:], axis=0)
+        ax[0].plot(t, avg_e[0,:], color=colors[0], label=labels[0])
+        ax[1].plot(t, pos_norm, color=colors[1], label=labels[1])
+        ax[0].set_ylabel("Orientation error [rad]")
+        ax[1].set_ylabel("Position error [m]")
+    else:
+        # Plot the bias error:
+        bias_norm = np.linalg.norm(avg_e[4:6,:], axis=0)
+        ax[0].plot(t, avg_e[3,:], color=colors[0], label=labels[0])
+        ax[1].plot(t, bias_norm, color=colors[1], label=labels[1])
+        ax[0].set_ylabel("Angular rate bias error [rad/s]")
+        ax[1].set_ylabel("Acceleration bias error [m/s^2]")
+    
+    # Common plot settings
+    for i in range(2):
+        ax[i].tick_params(direction='in')
+        ax[i].grid()
+        ax[i].set_xlabel("Time [s]")
+        ax[i].set_xlim([0, t[-1]])
+
 
 def plot_RMSE(ax: plt.Axes,
               x_est: np.ndarray,

@@ -60,6 +60,7 @@ class Robot_single:
         self.P_log = np.zeros((mf.STATE_LEN, mf.STATE_LEN, self.p_len)) # keeps a record of all covariances
         self.P_log[:,:,0] = P
         self.dt = dt
+        self.nis_IMU = np.zeros(self.p_len) # Keeps all recoreded NIS values
 
         self.mot = mf.MotionModel(x0 = x0, dt=dt, P=P, Q=Q)
         self.meas = mf.MeasModel(t=t, R=R)
@@ -80,22 +81,24 @@ class Robot_single:
         """
         Predict one timestep
         """
-        inno = 0
+        nis = 0
         if self.p_i < self.p_len-1:
             self.mot.predict()
             self.mot.propagate()
             if imu_correct:
-                inno, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], thres=thres)
+                nis, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], thres=thres)
 
             self.p_i += 1 
-
-            # Log updated quantities:        
-            self.x_log[:,self.p_i:self.p_i+1] = self.x
-            self.P_log[:,:,self.p_i] = self.P
         else:
             print("End of trajectory!!")
+            return nis
 
-        return inno
+        # Log updated quantities:        
+        self.x_log[:,self.p_i:self.p_i+1] = self.x
+        self.P_log[:,:,self.p_i] = self.P
+        self.nis_IMU[self.p_i - 1] = nis # -1, because it was due to IMU meas at that point
+
+        return nis
 
     def draw_position(self, ax, color = 'b'):
         # Qucikly plot the position
@@ -187,18 +190,19 @@ class robot_luft(Robot_single):
             self.mot.predict()
             self.mot.propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
             if imu_correct:
-                inno, _= mf.KF_IMU_rom(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
+                nis, _= mf.KF_IMU_rom(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
 
             self.p_i += 1 
-
-            # Log updated quantities:        
-            self.x_log[:,self.p_i:self.p_i+1] = self.x
-            self.P_log[:,:,self.p_i] = self.P
-            # TODO: log interrobot correlations as well 
         else:
             print("End of trajectory!!")
+            return nis
 
-        return inno
+        # Log updated quantities:        
+        self.x_log[:,self.p_i:self.p_i+1] = self.x
+        self.P_log[:,:,self.p_i] = self.P
+        self.nis_IMU[self.p_i - 1] = nis # -1, because it was due to IMU meas at that point
+
+        return nis
     
     def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0, thres=0, max_dist=-1):
         """
@@ -322,6 +326,35 @@ def RMSE(x_true, x_predicted, rad_sel):
     rmse = np.sqrt(1/N*rmse)    
     return rmse
 
+def abs_error(x_true, x_pred, rad_sel):
+    """
+    calculates the absolute error
+    For assessing the absolute performance
+    Does not handle multi-dimensional vectors!
+    """
+    x_num = x_pred.shape[1]
+    abs_e = np.abs(mf.subtractState(x_true, x_pred, np.repeat(rad_sel, x_num, axis=1)))
+    return abs_e
+
+def error_bp(r: Robot_single, bias):
+    """
+    Wrapper that handles position + bias error 
+    """
+    x_true = r.path
+    x_pred = r.x_log
+    abs_e_idx = np.array([mf.X_THETA, mf.X_P.start, mf.X_P.start+1, mf.X_BW, mf.X_BA.start, mf.X_BA.start+1])
+
+    # Extract only the quantities we are interested in
+    x_pred_bp = x_pred[abs_e_idx, :]
+    x_num = x_pred_bp.shape[1]
+    # Append biases to true
+    x_true_bp = np.append(x_true, np.repeat(bias, x_num, axis=1), axis=0)
+    # Then calculate error:
+    rad_sel = np.array([[True],[False],[False],[False],[False],[False]])
+    e_bp = abs_error(x_true_bp, x_pred_bp, rad_sel)
+    
+    return e_bp
+
 def NEES(x_est: np.ndarray, 
         x_true: np.ndarray, 
         P: np.ndarray, 
@@ -359,7 +392,30 @@ def NEES(x_est: np.ndarray,
     else:
         print("Number of x did not match number of P")
         return -1, -1, -1, -1
+
+def ANIS(nis,
+        df,
+        dt=1,
+        prob = 95):
+    """
+    Calculate ANIS
+    Note: degrees of freedom (df) has to be set manually. 
+    three for IMU, two for r/b
+    """
+    anis = np.zeros_like(nis[:,0])
+    x_num = nis.shape[0]
+    N = nis.shape[1]
+    t = np.linspace(0, x_num*dt, x_num)
+    for i in range(N):
+        anis += nis[:,i]
+    anis = 1.0/N*anis
+    # Plot anis:
+    a = 1-prob
+    r1 = 1.0/N*chi2.ppf(a/2.0, df=N*df)
+    r2 = 1.0/N*chi2.ppf(1-a/2.0, df=N*df)
     
+    return anis, t, r1, r2
+
 def ANEES(x_est: np.ndarray, 
         x_true: np.ndarray, 
         P: np.ndarray,
@@ -378,10 +434,10 @@ def ANEES(x_est: np.ndarray,
         # Add all nees up together:
         temp, t, _, _ = NEES(x_est[:,:,i], x_true, P[:,:,:,i], rad_sel=rad_sel, prob=prob, dt=dt)
         anees += temp
-    anees = 1/N*anees
+    anees = 1.0/N*anees
     # Calculate thresholds:
-    r1 = 1/N*chi2.ppf(a/2.0, df=N*x_len)
-    r2 = 1/N*chi2.ppf(1-a/2.0, df=N*x_len)
+    r1 = 1.0/N*chi2.ppf(a/2.0, df=N*x_len)
+    r2 = 1.0/N*chi2.ppf(1-a/2.0, df=N*x_len)
 
     return anees, t, r1, r2
 

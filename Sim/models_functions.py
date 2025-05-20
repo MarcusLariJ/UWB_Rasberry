@@ -486,13 +486,12 @@ def _KF_ml(x: np.ndarray,
     # Run ML step:
     r_sel = radian_sel
     #y, ml = ML_rb_gen(ys, ypred, S, r_sel)
-    y, md = MD_rb_gen(ys, ypred, Sinv, r_sel)
+    y, nis = MD_rb_gen(ys, ypred, Sinv, r_sel)
     # filter out unlikely measurements
-    if thres > 0 and md > thres:
-        print("Measurement rejected: MD of " + str(md))
-        inno_dummy = np.zeros((ys.shape[0],1))
+    if thres > 0 and nis > thres:
+        print("Measurement rejected: MD of " + str(nis[0,0]))
         K_dummy = np.zeros((x.shape[0], ys.shape[0]))
-        return x, P, inno_dummy, K_dummy 
+        return x, P, nis[0,0], K_dummy 
 
     # Then carry on with the Kalman Filter
     inno = subtractState(y, ypred, r_sel)
@@ -504,7 +503,7 @@ def _KF_ml(x: np.ndarray,
     IKC = (np.eye(P.shape[0]) - K @ H)
     Pnew = IKC @ P @ IKC.T + K @ R @ K.T
     # Return new values:
-    return xnew, Pnew, inno, K
+    return xnew, Pnew, nis[0,0], K
 
 def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray, thres: float = 0) -> np.ndarray:
     """
@@ -514,7 +513,7 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray, thres: float = 0) -
         meas (MeasModel): Measurement model of the robot
         y (np.ndarray): Incoming measurement
     Returns:
-        inno (np.ndarray): Innovation
+        nis float: Normalized innovation squared
         K (np.ndarray): Kalman gain vector
         H (np.ndarray): Output matrix
     """
@@ -524,11 +523,11 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray, thres: float = 0) -
     R = meas.R[Z_W:,Z_W:] # Only use noise related to IMU
     ypred = meas.h_IMU(x)
     radian_sel = meas.radian_sel[Z_W:]
-    xnew, Pnew, inno, K = _KF_ml(x, P, H, R, y, ypred, radian_sel, thres=thres) # only for filtering outliers TODO: not very efficient 
+    xnew, Pnew, nis, K = _KF_ml(x, P, H, R, y, ypred, radian_sel, thres=thres) # only for filtering outliers TODO: not very efficient 
     mot.x = xnew
     mot.P = Pnew
 
-    return inno, K, H
+    return nis, K, H
 
 def KF_rb(moti: MotionModel, 
             xj: MotionModel, 
@@ -546,7 +545,7 @@ def KF_rb(moti: MotionModel,
         measj (MeasModel): Meadurement model of the robot j
         y (np.ndarray): Incoming measurement
     Returns:
-        inno (np.ndarray): Innovation
+        nis (np.ndarray): Normalized innovation squared
         K (np.ndarray): Kalman gain vector
         H (np.ndarray):
     """
@@ -556,11 +555,11 @@ def KF_rb(moti: MotionModel,
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
     ypred = measi.h_rb(xi, xj, tj)
     radian_sel = measi.radian_sel[:Z_W]
-    xnew, Pnew, inno, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel, thres=thres)
+    xnew, Pnew, nis, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel, thres=thres)
     moti.x = xnew
     moti.P = Pnew
 
-    return inno, K, H
+    return nis, K, H
 
 def KF_rb_ext(moti: MotionModel, 
             motj: MotionModel, 
@@ -579,7 +578,7 @@ def KF_rb_ext(moti: MotionModel,
         measj (MeasModel): Meadurement model of the robot j
         y (np.ndarray): Incoming measurement
     Returns:
-        inno (np.ndarray): Innovation
+        nis (np.ndarray): Normalized innovation squared
         K (np.ndarray): Kalman gain vector
         H (np.ndarray):
     """
@@ -594,13 +593,13 @@ def KF_rb_ext(moti: MotionModel,
     radian_sel = measi.radian_sel[:Z_W]
     # Append both state vectors to get x:
     x = np.append(xi, xj, axis=0)
-    xnew, Pnew, inno, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel, thres=thres)
+    xnew, Pnew, nis, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel, thres=thres)
     moti.x = xnew[:STATE_LEN,:] # Update xi
     motj.x = xnew[STATE_LEN:,:] # Update xj
     moti.P = Pnew[:STATE_LEN, :STATE_LEN] # Update Pii
     motj.P = Pnew[STATE_LEN:,STATE_LEN:] # Update Pjj
 
-    return inno, K, H
+    return nis, K, H
 
 def KF_full(moti: MotionModel, 
             motj: MotionModel, 
@@ -621,6 +620,7 @@ def KF_full(moti: MotionModel,
         K (np.ndarray): Kalman gain vector
     """
     # TODO: delete
+    print("Don't use this")
     xi = moti.x
     xj = motj.x
     tj = measj.t
@@ -694,15 +694,15 @@ def KF_IMU_rom(mot: MotionModel,
         meas (MeasModel): Measurement model of the robot
         y (np.ndarray): Incoming measurement
     Returns:
-        inno (np.ndarray): Innovation
+        nis (np.ndarray): Normalized innovation squared
         K (np.ndarray): Kalman gain vector
     """
     # Run normal KF IMU 
-    inno, K, H = KF_IMU(mot, meas, y, thres=thres)
+    nis, K, H = KF_IMU(mot, meas, y, thres=thres)
     # Update correlations between robots
     rom_private(K, H, cor_list, cor_num)
 
-    return inno, K
+    return nis, K
 
 def KF_rb_rom(moti: MotionModel, 
             xj: np.ndarray, 
