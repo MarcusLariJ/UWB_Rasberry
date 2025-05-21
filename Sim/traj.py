@@ -217,7 +217,7 @@ def gen_rb(thetai, thetaj, posi, posj, ti, tj):
 
     return z
 
-def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=0):
+def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=0, amb=True):
     # TODO: look this function through, make sure it operates correct
     """
     Generate range/bearing measurement with front/back ambiguity.
@@ -226,13 +226,13 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=
     """
     # Precompute q
     q = (posj + mf.RM(thetaj) @ tj - posi - mf.RM(thetai) @ ti)
+    
     # Range and bearing:
-    ys = np.zeros((2,2)) # two ambiguities
-    ys[0,0] = np.arctan2(q[1], q[0]) - thetai # true measurement
-    ys[0,1] = np.pi - ys[0,0] # bad measurement TODO: can the wrappingpi function handle inputs oustide -180 to 180?
+    b = np.arctan2(q[1], q[0]) - thetai # true measurement
     r = np.sqrt(np.transpose(q) @ q)
 
-    # apply noise
+    # Generate noise
+    # Range noise
     if not (sr==0):
         r_noise = np.sqrt(sr)*np.random.randn()
         if not (pout_r==0) and np.random.rand() < pout_r:
@@ -240,15 +240,26 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=
             r_noise*5
             print("Range outlier generated") # debug
         r += r_noise
+        r = max(r,0) # ranges cannot be smaller than 0
+    
+    # Bearing noise
     if not (sb==0):
         b_noise = np.sqrt(sb)*np.random.randn()
         if not (pout_b==0) and np.random.rand() < pout_b:
             # If the returned unifrom probability is smaller than the threshold, generate an outlier:
             b_noise*5
             print("Bearing outlier generated") # debug
-        ys[0,0] += b_noise
-        ys[0,1] -= b_noise
-    r = max(r,0) # ranges cannot be smaller than 0
-    ys[1,0] = r
-    ys[1,1] = r
+        b += b_noise
+
+    if amb:
+        ys = np.zeros((2,2)) # two ambiguities
+        ys[0,0] = mf.normalize_angle(b)
+        ys[0,1] = mf.normalize_angle(np.pi - b) # bad measurement
+        ys[1,0] = r
+        ys[1,1] = r
+    else:
+        ys = np.zeros((2,1)) # No ambiguities
+        ys[0,0] = mf.normalize_angle(b)
+        ys[1,0] = r
+
     return ys

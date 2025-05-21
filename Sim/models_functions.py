@@ -38,6 +38,11 @@ U_ETABA = slice(4,6)
 
 #### Helper functions ####
 
+def normalize_angle(angle: float):
+    # Normalize the angle to be within the range -pi to pi
+    angle = (angle + np.pi) % (2 * np.pi) - np.pi
+    return angle
+
 def wrappingPi(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """ Takes in two arrays of radians and computes the difference when the scale is -pi to pi
 

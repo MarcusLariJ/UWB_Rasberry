@@ -205,10 +205,13 @@ class robot_luft(Robot_single):
 
         return nis
     
-    def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0, thres=0, max_dist=-1):
+    def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
         """
         Make measurement to anchor and use Rom methods for updating correlations
         """
+        # Get perfect measurement
+        
+
         # Get ambigious measurement
         ys = traj.gen_rb_amb(self.path[0,self.p_i], 
                            a.x[mf.X_THETA, 0], 
@@ -217,7 +220,8 @@ class robot_luft(Robot_single):
                            self.t,
                            a.t,
                            sr=sr,
-                           sb=sb)
+                           sb=sb,
+                           amb=amb)
         
         if (max_dist > 0 and ys[1,0] > max_dist):
             print("Anchor out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
@@ -233,7 +237,7 @@ class robot_luft(Robot_single):
         np.append(self.nis_rb, nis)
         return nis
     
-    def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1):
+    def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
         """
         Implements Lufts et al algorithm for CL localization
         """
@@ -245,7 +249,8 @@ class robot_luft(Robot_single):
                            self.t,
                            r.t,
                            sr=sr,
-                           sb=sb)
+                           sb=sb,
+                           amb=amb)
         if (max_dist > 0 and ys[1,0] > max_dist):
             print("Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None

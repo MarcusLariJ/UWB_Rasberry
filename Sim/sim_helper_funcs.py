@@ -255,16 +255,17 @@ def updateAllLuft(robot: rsim.robot_luft,
                    sr=0,
                    sb=0,
                    thres=0,
-                   max_dist=-1):
+                   max_dist=-1,
+                   amb=True):
     """
         Perform a measurements to all other robots
     """
     inno_anc = []
     inno_rob = []
     for a in anchor:
-        inno_anc += [robot.anchor_meas(a, ax, sr, sb, thres, max_dist)]
+        inno_anc += [robot.anchor_meas(a, ax, sr, sb, thres, max_dist, amb)]
     for r in rob_other:
-        inno_rob += [robot.robot_meas_luft(r, ax, sr, sb, thres, max_dist)]
+        inno_rob += [robot.robot_meas_luft(r, ax, sr, sb, thres, max_dist, amb)]
     
     return inno_anc, inno_rob
 
