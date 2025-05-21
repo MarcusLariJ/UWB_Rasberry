@@ -209,9 +209,6 @@ class robot_luft(Robot_single):
         """
         Make measurement to anchor and use Rom methods for updating correlations
         """
-        # Get perfect measurement
-        
-
         # Get ambigious measurement
         ys = traj.gen_rb_amb(self.path[0,self.p_i], 
                            a.x[mf.X_THETA, 0], 
@@ -237,6 +234,35 @@ class robot_luft(Robot_single):
         np.append(self.nis_rb, nis)
         return nis
     
+    def anchor_meas2(self, a: Anchor, ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+        """
+        Make measurement to anchor and use Rom methods for updating correlations
+        """
+        # Get ambigious measurement
+        ys = traj.gen_rb2_amb(self.path[0,self.p_i], 
+                           a.x[mf.X_THETA, 0], 
+                           self.path[1:3, self.p_i:self.p_i+1], 
+                           a.x[mf.X_P],
+                           self.t,
+                           a.t,
+                           sr=sr,
+                           sb=sb,
+                           amb=amb)
+        
+        if (max_dist > 0 and ys[1,0] > max_dist):
+            print("Anchor out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
+            return None
+        # Else: anchor within range:
+        print("Robot " + str(self.id) + " sees an anchor" + " at time " + str(self.p_i*self.dt))
+        nis, _ = mf.KF_rb_rom2(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
+        if not (ax==None):
+            rp.plot_measurement(ax, self.x, a.x)
+        # Log updated quantities:        
+        self.x_log[:,self.p_i:self.p_i+1] = self.x
+        self.P_log[:,:,self.p_i] = self.P
+        np.append(self.nis_rb, nis)
+        return nis
+
     def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
         """
         Implements Lufts et al algorithm for CL localization
@@ -260,6 +286,52 @@ class robot_luft(Robot_single):
         xj, Pjj, sigmaji, idj, tj = r.send_requested(self.id)
         # KF update
         xj_new, Pjj_new, cor_num, nis, _ = mf.KF_relative_luft(self.mot, 
+                                                                self.meas, 
+                                                                idj, 
+                                                                xj,
+                                                                Pjj,
+                                                                sigmaji, 
+                                                                tj,
+                                                                ys, 
+                                                                self.id_list,
+                                                                self.s_list,
+                                                                self.id_num,
+                                                                thres=thres)
+        self.id_num = cor_num
+        # send updated quantities back to j
+        r.recieve_update(xj_new, Pjj_new, self.id)
+
+        if not (ax==None):
+            rp.plot_measurement(ax, self.x, r.x)
+        # Log updated quantities:        
+        self.x_log[:,self.p_i:self.p_i+1] = self.x
+        self.P_log[:,:,self.p_i] = self.P
+        np.append(self.nis_rb, nis)
+        return nis
+    
+    def robot_meas_luft2(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+        """
+        Implements Lufts et al algorithm for CL localization
+        """
+        # Get ambigious measurement
+        ys = traj.gen_rb_amb(self.path[0,self.p_i], 
+                           r.path[0,r.p_i], 
+                           self.path[1:3, self.p_i:self.p_i+1], 
+                           r.path[1:3, r.p_i:r.p_i+1],
+                           self.t,
+                           r.t,
+                           sr=sr,
+                           sb=sb,
+                           amb=amb)
+        if (max_dist > 0 and ys[1,0] > max_dist):
+            print("Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
+            return None
+        # Else: robot within range:
+        print("Robot " + str(self.id) + " sees robot " + str(r.id) + " at time " + str(self.p_i*self.dt))
+        # Request quantities from other robot:
+        xj, Pjj, sigmaji, idj, tj = r.send_requested(self.id)
+        # KF update
+        xj_new, Pjj_new, cor_num, nis, _ = mf.KF_relative_luft2(self.mot, 
                                                                 self.meas, 
                                                                 idj, 
                                                                 xj,

@@ -11,6 +11,7 @@ STATE_LEN = 11
 MEAS_LEN = 5
 IMU_LEN = 3
 RB_LEN = 2
+RB2_LEN = 3
 INPUT_LEN = 6
 
 # Enums for state space:
@@ -26,7 +27,9 @@ X_P_EXT = slice(2+STATE_LEN, 4+STATE_LEN)
 
 # Enums for measurement space:
 Z_PHI = 0
+Z_PHI2 = 1
 Z_R = 1
+Z_R2 = 2
 Z_W = 2
 Z_A = slice(3,5)
 
@@ -159,6 +162,30 @@ class MeasModel:
 
         return self._z[:Z_W]
 
+    def h_rb2(self, xi: np.ndarray, xj: np.ndarray, tj: np.ndarray) -> np.ndarray:
+        """ 
+        Computes the masurement update when we have access to measurement with other robot
+        Uses both AoA and AoD
+
+        Args:
+            xi (np.ndarray): The information of the state of the ego robot i at time 'k'
+            xj (np.ndarray): The information of the state at the measured robot j at time 'k'
+            
+        Returns:
+            (np.ndarray): The measurement of state xi, xj 
+        """
+        z = np.zeros((RB2_LEN,1))
+        # Precompute q
+        thetaj = xj[X_THETA][0]
+        thetai = xi[X_THETA][0]
+        q = (xj[X_P] + RM(thetaj) @ tj - xi[X_P] - RM(thetai) @ self._t)
+        # Range and bearing:
+        z[Z_PHI] = np.arctan2(q[1], q[0]) - xi[X_THETA]
+        z[Z_PHI2] = np.arctan2(-q[1], -q[0]) - xj[X_THETA]
+        z[Z_R2] = np.sqrt(np.transpose(q) @ q)
+
+        return z
+
     def h_IMU(self, xi: np.ndarray) -> np.ndarray:
         """
         Computes the simple mesurement update, where we only have access to propertiary sensors
@@ -185,15 +212,7 @@ class MeasModel:
             
         Returns:
             (np.ndarray): The measurement of state xi, xj 
-        """
-        # Precompute q
-        #thetaj = xj[X_THETA][0]
-        #thetai = xi[X_THETA][0]
-        #q = (xj[X_P] + RM(thetaj) @ tj - xi[X_P] - RM(thetai) @ self._t)
-        # Range and bearing:
-        #self._z[Z_PHI] = np.arctan2(q[1], q[0]) - xi[X_THETA]
-        #self._z[Z_R] = np.sqrt(np.transpose(q) @ q)
-        
+        """        
         # RB measurement:
         self.h_rb(xi, xj, tj)
         # The IMU measurement:
@@ -270,6 +289,74 @@ class MeasModel:
 
         return Hij
 
+    def get_jacobian_rb2(self, xi0: np.ndarray, xj0: np.ndarray, tj: np.ndarray) -> np.ndarray:
+        """
+        Computes the jacobian at time k for the measurement
+        Takes into account both the AoA and AoD
+
+        Args:
+            xi0 (np.ndarray): The stationary point for the ego bot
+            xj0 (np.ndarray): The stationary point for the measurement bot
+            tj: (np.ndarray): The offset of the measurement bot
+
+        Returns:
+            (np.ndarray): The Jacobian matrix evaluated at xi0, xj0
+        """
+        # TODO: Check if output H is correct
+        H2 = np.zeros((RB2_LEN, STATE_LEN))
+
+        ti = self._t
+        thetai = xi0[X_THETA][0]
+        thetaj = xj0[X_THETA][0]
+        # Precompute q
+        q = (xj0[X_P] + RM(thetaj) @ tj - xi0[X_P] - RM(thetai) @ ti)
+        # Compute the Jacobian for range/angle measurement:
+        # 1st row
+        H2[Z_PHI, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) - 1
+        H2[Z_PHI, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
+        # 2nd row
+        H2[Z_PHI2, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q)
+        H2[Z_PHI2, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
+        # 3rd row
+        H2[Z_R2, X_THETA] = (np.transpose(q) @ (-RMdot(thetai)) @ ti + np.transpose(-RMdot(thetai) @ ti) @ q) / (2*np.sqrt(np.transpose(q) @ q))
+        H2[Z_R2, X_P] = -np.transpose(q) / np.sqrt(np.transpose(q) @ q)
+
+        return H2
+
+    def get_jacobian_rb_ext2(self, xi0: np.ndarray, xj0: np.ndarray, tj: np.ndarray) -> np.ndarray:
+        """
+        Computes the jacobian at time k for the measurement of both robots
+        Takes into account both the AoA and AoD
+
+        Args:
+            xi0 (np.ndarray): The stationary point for the ego bot
+            xj0 (np.ndarray): The stationary point for the measurement bot
+            tj: (np.ndarray): The offset of the measurement bot
+
+        Returns:
+            (np.ndarray): The Jacobian matrix evaluated at xi0, xj0
+        """
+        Hij2 = np.zeros((RB2_LEN, STATE_LEN*2))
+        ti = self._t
+        thetai = xi0[X_THETA][0]
+        thetaj = xj0[X_THETA][0]
+        # Precompute q
+        q = (xj0[X_P] + RM(thetaj) @ tj - xi0[X_P] - RM(thetai) @ ti)
+        # Compute the normal jacobian first
+        Hij2[:,:STATE_LEN] = self.get_jacobian_rb2(xi0=xi0, xj0=xj0, tj=tj)
+        # Then the extended part:
+        # 1st row
+        Hij2[Z_PHI, X_THETA_EXT] = (-RMdot(thetaj)[0,:] @ tj * q[1] + RMdot(thetaj)[1,:] @ tj * q[0])/(np.transpose(q) @ q)
+        Hij2[Z_PHI, X_P_EXT] = np.array([-q[1], q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
+        # 2nd row 
+        Hij2[Z_PHI2, X_THETA_EXT] = (-RMdot(thetaj)[0,:] @ tj * q[1] + RMdot(thetaj)[1,:] @ tj * q[0])/(np.transpose(q) @ q) - 1
+        Hij2[Z_PHI2, X_P_EXT] = np.array([-q[1], q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
+        # 3rd row
+        Hij2[Z_R2, X_THETA_EXT] = (np.transpose(q) @ (RMdot(thetaj)) @ tj + np.transpose(RMdot(thetaj) @ tj) @ q) / (2*np.sqrt(np.transpose(q) @ q))
+        Hij2[Z_R2, X_P_EXT] = np.transpose(q) / np.sqrt(np.transpose(q) @ q)
+
+        return Hij2
+
     def get_jacobian_IMU(self, x0: np.ndarray) -> np.ndarray:
         """
         Computes the jacobian at time k for the IMU measurement
@@ -302,17 +389,10 @@ class MeasModel:
         ti = self._t
         thetai = xi0[X_THETA][0]
         thetaj = xj0[X_THETA][0]
-        # Precompute q
-        q = (xj0[X_P] + RM(thetaj) @ tj - xi0[X_P] - RM(thetai) @ ti)
         # Compute the Jacobian for IMU measurement:
         self.get_jacobian_IMU(xi0)
         # Compute the Jacobian for range/angle measurement:
         self.get_jacobian_rb(xi0, xj0, tj)
-
-        #self._H[Z_PHI, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) - 1
-        #self._H[Z_PHI, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
-        #self._H[Z_R, X_THETA] = (np.transpose(q) @ (-RMdot(thetai)) @ ti + np.transpose(-RMdot(thetai) @ ti) @ q) / (2*np.sqrt(np.transpose(q) @ q))
-        #self._H[Z_R, X_P] = -np.transpose(q) / np.sqrt(np.transpose(q) @ q)
 
         return self._H
 
@@ -566,6 +646,41 @@ def KF_rb(moti: MotionModel,
 
     return nis, K, H
 
+def KF_rb2(moti: MotionModel, 
+            xj: MotionModel, 
+            measi: MeasModel,
+            tj: np.ndarray, 
+            ys: np.ndarray,
+            thres=0) -> np.ndarray:
+    """
+    KF for and range/bearing measurement between robot i and anchor j
+    Assumes no uncertainty about state vector of j!
+    Uses both AoA and AoD measurements
+    Args:
+        moti (MotionModel): Motion model of the ego robot i 
+        motj (MotionModel): Motion model of the other robot j
+        measi (MeasModel): Measurement model of the robot i
+        measj (MeasModel): Meadurement model of the robot j
+        y (np.ndarray): Incoming measurement
+    Returns:
+        nis (np.ndarray): Normalized innovation squared
+        K (np.ndarray): Kalman gain vector
+        H (np.ndarray):
+    """
+    xi = moti.x
+    P = moti.P
+    H = measi.get_jacobian_rb2(xi, xj, tj)
+    ypred = measi.h_rb2(xi, xj, tj)
+
+    radian_sel = np.array([[True],[True],[False]]) #TODO: not the best that this is hardcoded
+    R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: #neither is this
+    
+    xnew, Pnew, nis, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel, thres=thres)
+    moti.x = xnew
+    moti.P = Pnew
+
+    return nis, K, H
+
 def KF_rb_ext(moti: MotionModel, 
             motj: MotionModel, 
             measi: MeasModel,
@@ -596,6 +711,49 @@ def KF_rb_ext(moti: MotionModel,
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
     ypred = measi.h_rb(xi, xj, tj)
     radian_sel = measi.radian_sel[:Z_W]
+    # Append both state vectors to get x:
+    x = np.append(xi, xj, axis=0)
+    xnew, Pnew, nis, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel, thres=thres)
+    moti.x = xnew[:STATE_LEN,:] # Update xi
+    motj.x = xnew[STATE_LEN:,:] # Update xj
+    moti.P = Pnew[:STATE_LEN, :STATE_LEN] # Update Pii
+    motj.P = Pnew[STATE_LEN:,STATE_LEN:] # Update Pjj
+
+    return nis, K, H
+
+def KF_rb_ext2(moti: MotionModel, 
+            motj: MotionModel, 
+            measi: MeasModel,
+            tj: np.ndarray, 
+            ys: np.ndarray,
+            thres=0) -> np.ndarray:
+    """
+    KF for and range/bearing measurement between robot i and j,
+    that takes both noise sources into account.
+    Used for the naive implementation of collaborative localization
+    Uses both AoA and AoD
+    Args:
+        moti (MotionModel): Motion model of the ego robot i 
+        motj (MotionModel): Motion model of the other robot j
+        measi (MeasModel): Measurement model of the robot i
+        measj (MeasModel): Meadurement model of the robot j
+        y (np.ndarray): Incoming measurement
+    Returns:
+        nis (np.ndarray): Normalized innovation squared
+        K (np.ndarray): Kalman gain vector
+        H (np.ndarray):
+    """
+    xi = moti.x
+    xj = motj.x
+    P = np.zeros((2*STATE_LEN, 2*STATE_LEN))
+    P[:STATE_LEN, :STATE_LEN] = moti.P #Pii
+    P[STATE_LEN:, STATE_LEN:] = motj.P #Pjj
+    H = measi.get_jacobian_rb_ext2(xi, xj, tj)
+    ypred = measi.h_rb2(xi, xj, tj)
+
+    radian_sel = np.array([[True],[True],[False]]) #TODO: not the best that this is hardcoded
+    R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: #neither is this    
+
     # Append both state vectors to get x:
     x = np.append(xi, xj, axis=0)
     xnew, Pnew, nis, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel, thres=thres)
@@ -739,6 +897,36 @@ def KF_rb_rom(moti: MotionModel,
 
     return nis, K
 
+def KF_rb_rom2(moti: MotionModel, 
+            xj: np.ndarray, 
+            measi: MeasModel,
+            tj: np.ndarray, 
+            ys: np.ndarray,
+            cor_list: np.ndarray,
+            cor_num: int,
+            thres=0) -> np.ndarray:
+    """
+    KF for and range/bearing measurement between robot i and anchor j
+    Assumes no uncertainty about state vector of j!
+    Uses Rom method for updating all inter-robot correlations
+    Args:
+        moti (MotionModel): Motion model of the ego robot i 
+        motj (MotionModel): Motion model of the other robot j
+        measi (MeasModel): Measurement model of the robot i
+        measj (MeasModel): Meadurement model of the robot j
+        y (np.ndarray): Incoming measurement
+    Returns:
+        inno (np.ndarray): Innovation
+        K (np.ndarray): Kalman gain vector
+        H (np.ndarray):
+    """
+    # Run normal KF robot to anchor measurement
+    nis, K, H = KF_rb2(moti, xj, measi, tj, ys, thres=thres)
+    # Then update correlations
+    rom_private(K, H, cor_list, cor_num)
+
+    return nis, K
+
 def _KF_relative_decen(moti: MotionModel,  
             measi: MeasModel,
             idj: int,
@@ -792,6 +980,59 @@ def _KF_relative_decen(moti: MotionModel,
     cor_list[:,:,idx] = Pij_new # update the ij correlation
     return xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K
 
+def _KF_relative_decen2(moti: MotionModel,  
+            measi: MeasModel,
+            idj: int,
+            xj: np.ndarray,
+            Pjj: np.ndarray,
+            sigmaji: np.ndarray,
+            tj: np.ndarray,
+            ys: np.ndarray,
+            id_list: dict,
+            cor_list: np.ndarray,
+            cor_num: int,
+            thres=0):
+    # First, check if we have made a measurement to this robot before:
+    if idj not in id_list.keys():
+        print("Adding new robot: " + str(idj))
+        idx = cor_num
+        id_list[idj] = idx
+        cor_num += 1 # TODO: No limit on growt, but np array has a max! Add limit check here
+        Pij = np.zeros((STATE_LEN, STATE_LEN))
+    else: 
+        idx = id_list[idj]
+        Pij = cor_list[:,:,idx] @ sigmaji.T
+    # DEBUG:
+    #Pij = np.zeros((STATE_LEN, STATE_LEN)) # DEBUG: always set to zero, to see if correlations cause problems
+    # Put together Paa matrix:
+    Pii = moti.P
+    Paa = np.zeros((STATE_LEN*2, STATE_LEN*2))
+    Paa[:STATE_LEN, :STATE_LEN] = Pii
+    Paa[:STATE_LEN, STATE_LEN:] = Pij
+    Paa[STATE_LEN:, :STATE_LEN] = Pij.T
+    Paa[STATE_LEN:, STATE_LEN:] = Pjj    
+    # Ensure that Paa is PD: (maybe this is only needed on Pii/Pjj)
+    Paa = 1/2*(Paa + Paa.T)
+    # Get Ha matrix:
+    Ha = measi.get_jacobian_rb_ext2(moti.x, xj, tj)
+    # Get the argumented state vector
+    xa = np.append(moti.x, xj, axis=0)
+    # calculate 
+    ypred = measi.h_rb2(moti.x, xj, tj)
+    R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing
+    rad_sel = measi.radian_sel[:Z_W]
+    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel, thres=thres)
+    #print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
+    # Now, split up the results:
+    moti.x = xnew[:STATE_LEN, 0:1]
+    xj_new = xnew[STATE_LEN:, 0:1]
+    Pii_new = Pnew[:STATE_LEN, :STATE_LEN]
+    Pjj_new = Pnew[STATE_LEN:, STATE_LEN:]
+    Pij_new = Pnew[:STATE_LEN, STATE_LEN:]
+    moti.P = Pii_new
+    cor_list[:,:,idx] = Pij_new # update the ij correlation
+    return xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K
+
 def KF_relative_luft(moti: MotionModel,  
             measi: MeasModel,
             idj: int,
@@ -826,6 +1067,58 @@ def KF_relative_luft(moti: MotionModel,
     """
     # first, perform the first part of the algorithm:
     xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K = _KF_relative_decen(moti, 
+                                                                        measi, 
+                                                                        idj, 
+                                                                        xj, 
+                                                                        Pjj, 
+                                                                        sigmaji, 
+                                                                        tj, 
+                                                                        ys, 
+                                                                        id_list, 
+                                                                        cor_list, 
+                                                                        cor_num,
+                                                                        thres=thres)
+    # Finally, approximate inter-robot correlations
+    luft_relative(Pii_new, Pii, idj, id_list, cor_list)
+    #TODO: check if id_list and cor_list gets updated correctly
+    # xj_new and Pjj_new should be transmitted to the other robot
+    return xj_new, Pjj_new, cor_num, nis, K 
+
+def KF_relative_luft2(moti: MotionModel,  
+            measi: MeasModel,
+            idj: int,
+            xj: np.ndarray,
+            Pjj: np.ndarray,
+            sigmaji: np.ndarray,
+            tj: np.ndarray,
+            ys: np.ndarray,
+            id_list: dict,
+            cor_list: np.ndarray,
+            cor_num: int,
+            thres=0):
+    """
+    Luft et als algorithm, that approximates inter-robot correlations for non-participating robots
+    For when we have access to AoA and AoD
+    Args:
+        moti (MotionModel): Motion model of the ego robot i 
+        measi (MeasModel): Measurement model of the robot i
+        idj (int): id of other robot j
+        xj (np.ndarray): State vector of other robot j
+        Pjj (np.ndarray): Covariance of other robot j
+        sigmaji (np.ndarray): correlation to other robot j
+        y (np.ndarray): Incoming measurement
+        id_list (dict): List of ids
+        cor_list (np.ndarray): List of inter-robot correlations
+        cor_num (int): length of list 
+    Returns:
+        xj_new (np.ndarray): New xj
+        Pjj_new (np.ndarray): new Pjj. Use to update robot j
+        cor_num (int): new length of list
+        inno (np.ndarray): Innovation
+        K (np.ndarray): Kalman gain vector
+    """
+    # first, perform the first part of the algorithm:
+    xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K = _KF_relative_decen2(moti, 
                                                                         measi, 
                                                                         idj, 
                                                                         xj, 

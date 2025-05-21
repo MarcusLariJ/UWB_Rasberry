@@ -263,3 +263,33 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=
         ys[1,0] = r
 
     return ys
+
+def gen_rb2_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=0, amb=True):
+    """
+    Generates two measurements - one for AoA and one for AoD
+    """
+    y1 = gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb, sr, pout_r, pout_b, amb)
+    y2 = gen_rb_amb(thetaj, thetai, posj, posi, tj, ti, sb, sr, pout_r, pout_b, amb)
+    # Now mix them:
+    if not amb:
+        # 'perfect' measurement
+        y_out = np.zeros((mf.RB2_LEN, 1))
+        y_out[mf.Z_PHI, 0] = y1[mf.Z_PHI, 0]
+        y_out[mf.Z_PHI2, 0] = y2[mf.Z_PHI, 0]
+        y_out[mf.Z_R2, 0] = y1[mf.Z_R, 0]
+    else: 
+        # Ambigious measurement
+        y_out = np.zeros((mf.RB2_LEN, 4))
+        
+        y_out[mf.Z_PHI, 0] = y1[mf.Z_PHI, 0]
+        y_out[mf.Z_PHI2, 0] = y2[mf.Z_PHI, 0]
+        y_out[mf.Z_PHI, 1] = y1[mf.Z_PHI, 1]
+        y_out[mf.Z_PHI2, 1] = y2[mf.Z_PHI, 0]
+        y_out[mf.Z_PHI, 2] = y1[mf.Z_PHI, 0]
+        y_out[mf.Z_PHI2, 2] = y2[mf.Z_PHI, 1]
+        y_out[mf.Z_PHI, 3] = y1[mf.Z_PHI, 1]
+        y_out[mf.Z_PHI2, 3] = y2[mf.Z_PHI, 1]
+
+        y_out[mf.Z_R2, :] = y1[mf.Z_R, 0]
+
+    return y_out
