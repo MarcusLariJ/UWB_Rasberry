@@ -1019,8 +1019,10 @@ def _KF_relative_decen2(moti: MotionModel,
     xa = np.append(moti.x, xj, axis=0)
     # calculate 
     ypred = measi.h_rb2(moti.x, xj, tj)
-    R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing
-    rad_sel = measi.radian_sel[:Z_W]
+
+    rad_sel = np.array([[True],[True],[False]]) #TODO: not the best that this is hardcoded
+    R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: #neither is this
+
     xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel, thres=thres)
     #print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
     # Now, split up the results:

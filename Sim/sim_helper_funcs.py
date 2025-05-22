@@ -256,18 +256,21 @@ def updateAllLuft(robot: rsim.robot_luft,
                    sb=0,
                    thres=0,
                    max_dist=-1,
-                   amb=True):
+                   amb=True,
+                   meas2=False):
     """
         Perform a measurements to all other robots
     """
-    inno_anc = []
-    inno_rob = []
     for a in anchor:
-        inno_anc += [robot.anchor_meas(a, ax, sr, sb, thres, max_dist, amb)]
+        if not meas2:
+            robot.anchor_meas(a, ax, sr, sb, thres, max_dist, amb)
+        else: 
+            robot.anchor_meas2(a, ax, sr, sb, thres, max_dist, amb)
     for r in rob_other:
-        inno_rob += [robot.robot_meas_luft(r, ax, sr, sb, thres, max_dist, amb)]
-    
-    return inno_anc, inno_rob
+        if not meas2:
+            robot.robot_meas_luft(r, ax, sr, sb, thres, max_dist, amb)
+        else:
+            robot.robot_meas_luft2(r, ax, sr, sb, thres, max_dist, amb)
 
 def updateAllSimple(robot: rsim.Robot_single, 
                    anchor: list, rob_other: list,
@@ -278,11 +281,7 @@ def updateAllSimple(robot: rsim.Robot_single,
     """
         Perform a measurements to all other robots
     """
-    inno_anc = []
-    inno_rob = []
     for a in anchor:
-        inno_anc += [robot.anchor_meas(a, ax, sr, sb, thres)]
+        robot.anchor_meas(a, ax, sr, sb, thres)
     for r in rob_other:
-        inno_rob += [robot.robot_meas(r, ax, sr, sb, thres)]
-    
-    return inno_anc, inno_rob
+        robot.robot_meas(r, ax, sr, sb, thres)

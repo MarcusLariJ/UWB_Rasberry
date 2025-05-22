@@ -10,13 +10,15 @@ from scipy.stats.distributions import chi2
 
 class Anchor:
     def __init__(self, x0: np.ndarray,
-                 t: np.ndarray = np.array([[0],[0]])
+                 t: np.ndarray = np.array([[0],[0]]),
+                 id: int = 0
                  ):
         """
         Inits a very simple anchor model
         """
         self.mot = mf.MotionModel(x0=x0)
         self.meas = mf.MeasModel(t=t)
+        self.id = id
 
     @property
     def x(self) -> np.ndarray:
@@ -39,6 +41,7 @@ class Robot_single:
     def __init__(self, x0: np.ndarray,
                  path: np.ndarray, 
                  imu: np.ndarray,
+                 id: int, 
                  dt: float = 1.0,
                  P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
                  Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 0.000001, 0.00001, 0.00001]),
@@ -51,6 +54,7 @@ class Robot_single:
             path (np.ndarray): trajectory to follow
             imu (np.ndarray): imu measurements of path
         """
+        self.id = id
         self.path = path
         self.imu = imu
         self.p_i = 0 # index of path
@@ -61,7 +65,8 @@ class Robot_single:
         self.P_log[:,:,0] = P
         self.dt = dt
         self.nis_IMU = np.zeros(self.p_len) # Keeps all recoreded IMU NIS values
-        self.nis_rb = np.zeros(0) # Keeps all recorded RB NIS
+        self.nis_rb = np.zeros(self.p_len) # Keeps all recorded RB NIS
+        self.rb_ids = np.zeros(self.p_len) # Keeps track of the robot/anchors we communicated with
 
         self.mot = mf.MotionModel(x0 = x0, dt=dt, P=P, Q=Q)
         self.meas = mf.MeasModel(t=t, R=R)
@@ -174,9 +179,8 @@ class robot_luft(Robot_single):
             path (np.ndarray): trajectory to follow
             imu (np.ndarray): imu measurements of path
         """
-        super().__init__(x0=x0, path=path, imu=imu, dt=dt, P=P, Q=Q, R=R, t=t)
+        super().__init__(x0=x0, path=path, imu=imu, dt=dt, P=P, Q=Q, R=R, t=t, id=id)
         # Setup list of robots we have met
-        self.id = id
         self.id_len = 10 # Allocate memory for 10 robots
         self.id_num = 0 # current length of dictionary
         self.id_list = {}
@@ -221,17 +225,18 @@ class robot_luft(Robot_single):
                            amb=amb)
         
         if (max_dist > 0 and ys[1,0] > max_dist):
-            print("Anchor out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
+            print("Anchor " + str(a.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: anchor within range:
-        print("Robot " + str(self.id) + " sees an anchor" + " at time " + str(self.p_i*self.dt))
+        print("Robot " + str(self.id) + " sees anchor " + str(a.id) + " at time " + str(self.p_i*self.dt))
         nis, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
-        np.append(self.nis_rb, nis)
+        self.nis_rb[self.p_i] = nis
+        self.rb_ids[self.p_i] = a.id
         return nis
     
     def anchor_meas2(self, a: Anchor, ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
@@ -250,17 +255,18 @@ class robot_luft(Robot_single):
                            amb=amb)
         
         if (max_dist > 0 and ys[1,0] > max_dist):
-            print("Anchor out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
+            print("Anchor " + str(a.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: anchor within range:
-        print("Robot " + str(self.id) + " sees an anchor" + " at time " + str(self.p_i*self.dt))
+        print("Robot " + str(self.id) + " sees anchor " + str(a.id) + " at time " + str(self.p_i*self.dt))
         nis, _ = mf.KF_rb_rom2(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
         if not (ax==None):
             rp.plot_measurement(ax, self.x, a.x)
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
-        np.append(self.nis_rb, nis)
+        self.nis_rb[self.p_i] = nis
+        self.rb_ids[self.p_i] = a.id
         return nis
 
     def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
@@ -306,7 +312,8 @@ class robot_luft(Robot_single):
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
-        np.append(self.nis_rb, nis)
+        self.nis_rb[self.p_i] = nis
+        self.rb_ids[self.p_i] = r.id
         return nis
     
     def robot_meas_luft2(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
@@ -352,7 +359,8 @@ class robot_luft(Robot_single):
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
-        np.append(self.nis_rb, nis)
+        self.nis_rb[self.p_i] = nis
+        self.rb_ids[self.p_i] = r.id
         return nis
 
     def robot_meas_rom(self, raa: 'robot_luft', rbb: list, ax = None, sr=0, sb=0):
