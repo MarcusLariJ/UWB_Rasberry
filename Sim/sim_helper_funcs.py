@@ -2,6 +2,7 @@ import numpy as np
 import models_functions as mf
 import robot_sim as rsim
 import traj as traj
+import math
 
 ########### different anchor setups ##############
 def anc_setup1():
@@ -249,28 +250,62 @@ def path6_fast(dt=1):
 
 ########### Functions to handle updates ##############
 
-def updateAllLuft(robot: rsim.robot_luft, 
-                   anchor: list, rob_other: list,
-                   ax = None,
-                   sr=0,
-                   sb=0,
-                   thres=0,
-                   max_dist=-1,
-                   amb=True,
-                   meas2=False):
+def updateAllLuft(robots: list, 
+                   update_list: list,
+                   params: list,
+                   i_indx: int,
+                   dt: int,
+                   update_freq: float,
+                   exch_time: float):
     """
-        Perform a measurements to all other robots
+        Perform a measurements to all other robots.
+        Each indivudal robot have a delay between measurements of exc_time
+        Each robot attempts to start a measurement chain at the frequency given by update_freq.
+        The robots have an offset in when they start a measurement chain, so they are evenly spaced out
+        # Params have the shape:
+        [[sr=0, sb=0, thres=0, max_dist=-1, amb=True, meas2=False],
+        ...,
+        ...]
     """
-    for a in anchor:
-        if not meas2:
-            robot.anchor_meas(a, ax, sr, sb, thres, max_dist, amb)
-        else: 
-            robot.anchor_meas2(a, ax, sr, sb, thres, max_dist, amb)
-    for r in rob_other:
-        if not meas2:
-            robot.robot_meas_luft(r, ax, sr, sb, thres, max_dist, amb)
-        else:
-            robot.robot_meas_luft2(r, ax, sr, sb, thres, max_dist, amb)
+    # We are doing something a bit dirty here
+    # This also means i == 0 HAS TO EXIST
+    if i_indx == 0:
+        updateAllLuft.j = 0
+        updateAllLuft.robi = 0
+        updateAllLuft.next_time = 0
+
+    freq_time = round(update_freq/dt)
+    N = len(robots)
+    offset = math.floor(freq_time/N)
+
+    for i in range(N):
+        # Update which robot should be updating:
+        if (i_indx + offset*i) % freq_time == 0:
+            updateAllLuft.robi = i
+            updateAllLuft.j = 0
+            updateAllLuft.next_time = 0
+
+    # Now handle the updating for the specific robot:
+    if updateAllLuft.j < len(update_list[updateAllLuft.robi]):
+        if i_indx >= updateAllLuft.next_time:
+            # Make measurements:
+            j = updateAllLuft.j
+            i = updateAllLuft.robi
+            while (update_list[i][j] is None) or (robots[i] == update_list[i][j]):
+                # This is to clear out disabled measurements (fx an anchor is set to None, to simulate it being disabled)
+                # And to ignore if the robot tries to conduct a measurement with itself
+                updateAllLuft.j += 1
+                j = updateAllLuft.j
+            if isinstance(update_list[i][j], rsim.Anchor):
+                robots[i].anchor_meas(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4])
+            elif isinstance(update_list[i][j], rsim.robot_luft):
+                robots[i].robot_meas_luft(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4])
+            # Update timings
+            updateAllLuft.next_time = round(i_indx + exch_time/dt)
+            updateAllLuft.j += 1
+    return
+
+
 
 def updateAllSimple(robot: rsim.Robot_single, 
                    anchor: list, rob_other: list,

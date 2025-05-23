@@ -209,7 +209,7 @@ class robot_luft(Robot_single):
 
         return nis
     
-    def anchor_meas(self, a: Anchor, ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+    def anchor_meas(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
         """
         Make measurement to anchor and use Rom methods for updating correlations
         """
@@ -230,8 +230,6 @@ class robot_luft(Robot_single):
         # Else: anchor within range:
         print("Robot " + str(self.id) + " sees anchor " + str(a.id) + " at time " + str(self.p_i*self.dt))
         nis, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
-        if not (ax==None):
-            rp.plot_measurement(ax, self.x, a.x)
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
@@ -239,7 +237,7 @@ class robot_luft(Robot_single):
         self.rb_ids[self.p_i] = a.id
         return nis
     
-    def anchor_meas2(self, a: Anchor, ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+    def anchor_meas2(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
         """
         Make measurement to anchor and use Rom methods for updating correlations
         """
@@ -260,8 +258,6 @@ class robot_luft(Robot_single):
         # Else: anchor within range:
         print("Robot " + str(self.id) + " sees anchor " + str(a.id) + " at time " + str(self.p_i*self.dt))
         nis, _ = mf.KF_rb_rom2(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
-        if not (ax==None):
-            rp.plot_measurement(ax, self.x, a.x)
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
@@ -269,7 +265,7 @@ class robot_luft(Robot_single):
         self.rb_ids[self.p_i] = a.id
         return nis
 
-    def robot_meas_luft(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+    def robot_meas_luft(self, r: 'robot_luft', sr=0, sb=0, thres=0, max_dist=-1, amb=True):
         """
         Implements Lufts et al algorithm for CL localization
         """
@@ -307,8 +303,6 @@ class robot_luft(Robot_single):
         # send updated quantities back to j
         r.recieve_update(xj_new, Pjj_new, self.id)
 
-        if not (ax==None):
-            rp.plot_measurement(ax, self.x, r.x)
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
@@ -316,7 +310,7 @@ class robot_luft(Robot_single):
         self.rb_ids[self.p_i] = r.id
         return nis
     
-    def robot_meas_luft2(self, r: 'robot_luft', ax = None, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+    def robot_meas_luft2(self, r: 'robot_luft', sr=0, sb=0, thres=0, max_dist=-1, amb=True):
         """
         Implements Lufts et al algorithm for CL localization
         """
@@ -354,8 +348,6 @@ class robot_luft(Robot_single):
         # send updated quantities back to j
         r.recieve_update(xj_new, Pjj_new, self.id)
 
-        if not (ax==None):
-            rp.plot_measurement(ax, self.x, r.x)
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
