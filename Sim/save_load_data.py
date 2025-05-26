@@ -6,12 +6,20 @@ class RobotData():
     """
         Save data from a single robot from N runs of length L
     """
-    def __init__(self, x_log: np.ndarray, P_log: np.ndarray, IMU_nis_log: np.ndarray, RB_nis_log: np.ndarray, pos: np.ndarray, id: int, rb_ids: np.ndarray):
+    def __init__(self, x_log: np.ndarray, 
+                 P_log: np.ndarray, 
+                 IMU_nis_log: np.ndarray, 
+                 RB_nis_log: np.ndarray, 
+                 pos: np.ndarray,
+                 biases: np.ndarray, 
+                 id: int, 
+                 rb_ids: np.ndarray):
         self.x_log = x_log # state logged by robot
         self.P_log = P_log # covariance logged by robot
         self.IMU_nis_log = IMU_nis_log # IMU NIS logged by robot
         self.RB_nis_log = RB_nis_log # RB NIS logged by robot
         self.pos = pos # the reference position
+        self.biases = biases # the constant bias applied during this run
         self.id = id
         self.rb_ids = rb_ids
 

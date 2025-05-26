@@ -315,7 +315,7 @@ class robot_luft(Robot_single):
         Implements Lufts et al algorithm for CL localization
         """
         # Get ambigious measurement
-        ys = traj.gen_rb_amb(self.path[0,self.p_i], 
+        ys = traj.gen_rb2_amb(self.path[0,self.p_i], 
                            r.path[0,r.p_i], 
                            self.path[1:3, self.p_i:self.p_i+1], 
                            r.path[1:3, r.p_i:r.p_i+1],

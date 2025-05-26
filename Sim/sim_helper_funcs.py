@@ -93,8 +93,8 @@ def path3_slow(dt=1):
     Two rounds
     """
     xa = np.zeros((mf.STATE_LEN, 1)); xa[:6] = np.array([[-1.57],[0],[10],[60],[0],[0]])
-    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[20],[5],[0.5],[0]])
-    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[1.57],[0],[80],[20],[0],[0.5]])
+    xb = np.zeros((mf.STATE_LEN, 1)); xb[:6] = np.array([[0],[0],[20],[20],[0.5],[0]])
+    xc = np.zeros((mf.STATE_LEN, 1)); xc[:6] = np.array([[1.57],[0],[80],[30],[0],[0.5]])
     xd = np.zeros((mf.STATE_LEN, 1)); xd[:6] = np.array([[3.14],[0],[85],[60],[0],[0]])
     xe = np.zeros((mf.STATE_LEN, 1)); xe[:6] = np.array([[3.14],[0],[50],[40],[-0.5],[0]])
     xf = np.zeros((mf.STATE_LEN, 1)); xf[:6] = np.array([[1.57],[0],[40],[50],[0],[0.05]])
@@ -102,7 +102,7 @@ def path3_slow(dt=1):
     xh = np.zeros((mf.STATE_LEN, 1)); xh[:6] = np.array([[-1.57],[0],[5],[5],[-0.5],[0]])
 
     pos, y_IMU = traj.gen_poly_traj_multi(pos=[xa, xa, xb, xc, xd, xe, xf, xg, xh], 
-                                          time=[0, 30, 140, 220, 280, 360, 400, 480, 630], dt=dt)
+                                          time=[0, 30, 120, 220, 280, 360, 400, 480, 630], dt=dt)
 
     return pos, y_IMU, xa
 
@@ -296,10 +296,23 @@ def updateAllLuft(robots: list,
                 # And to ignore if the robot tries to conduct a measurement with itself
                 updateAllLuft.j += 1
                 j = updateAllLuft.j
+                if j >= len(update_list[updateAllLuft.robi]):
+                    # Safety check, in case the last robot is None/self
+                    return
             if isinstance(update_list[i][j], rsim.Anchor):
-                robots[i].anchor_meas(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4])
+                if params[i][5]:
+                    # Use the alternative measurement model:
+                    robots[i].anchor_meas2(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4])
+                else:
+                    # Use normal measurement model:
+                    robots[i].anchor_meas(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4])
             elif isinstance(update_list[i][j], rsim.robot_luft):
-                robots[i].robot_meas_luft(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4])
+                if params[i][5]:
+                    # Use the alternative measurement model:
+                    robots[i].robot_meas_luft2(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4])
+                else:
+                    # Use normal measurement model:
+                    robots[i].robot_meas_luft(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4])
             # Update timings
             updateAllLuft.next_time = round(i_indx + exch_time/dt)
             updateAllLuft.j += 1
