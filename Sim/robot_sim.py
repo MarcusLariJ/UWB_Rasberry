@@ -209,7 +209,7 @@ class robot_luft(Robot_single):
 
         return nis
     
-    def anchor_meas(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+    def anchor_meas(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True, pout_r=0, pout_b=0):
         """
         Make measurement to anchor and use Rom methods for updating correlations
         """
@@ -222,7 +222,9 @@ class robot_luft(Robot_single):
                            a.t,
                            sr=sr,
                            sb=sb,
-                           amb=amb)
+                           amb=amb,
+                           pout_r=pout_r,
+                           pout_b=pout_b)
         
         if (max_dist > 0 and ys[1,0] > max_dist):
             print("Anchor " + str(a.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
@@ -237,7 +239,7 @@ class robot_luft(Robot_single):
         self.rb_ids[self.p_i] = a.id
         return nis
     
-    def anchor_meas2(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+    def anchor_meas2(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True, pout_r=0, pout_b=0):
         """
         Make measurement to anchor and use Rom methods for updating correlations
         """
@@ -250,7 +252,9 @@ class robot_luft(Robot_single):
                            a.t,
                            sr=sr,
                            sb=sb,
-                           amb=amb)
+                           amb=amb,
+                           pout_r=pout_r,
+                           pout_b=pout_b)
         
         if (max_dist > 0 and ys[1,0] > max_dist):
             print("Anchor " + str(a.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
@@ -265,7 +269,7 @@ class robot_luft(Robot_single):
         self.rb_ids[self.p_i] = a.id
         return nis
 
-    def robot_meas_luft(self, r: 'robot_luft', sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+    def robot_meas_luft(self, r: 'robot_luft', sr=0, sb=0, thres=0, max_dist=-1, amb=True, pout_r=0, pout_b=0):
         """
         Implements Lufts et al algorithm for CL localization
         """
@@ -278,7 +282,9 @@ class robot_luft(Robot_single):
                            r.t,
                            sr=sr,
                            sb=sb,
-                           amb=amb)
+                           amb=amb,
+                           pout_r=pout_r,
+                           pout_b=pout_b)
         if (max_dist > 0 and ys[1,0] > max_dist):
             print("Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
@@ -310,7 +316,7 @@ class robot_luft(Robot_single):
         self.rb_ids[self.p_i] = r.id
         return nis
     
-    def robot_meas_luft2(self, r: 'robot_luft', sr=0, sb=0, thres=0, max_dist=-1, amb=True):
+    def robot_meas_luft2(self, r: 'robot_luft', sr=0, sb=0, thres=0, max_dist=-1, amb=True, pout_r=0, pout_b=0):
         """
         Implements Lufts et al algorithm for CL localization
         """
@@ -323,7 +329,9 @@ class robot_luft(Robot_single):
                            r.t,
                            sr=sr,
                            sb=sb,
-                           amb=amb)
+                           amb=amb,
+                           pout_r=pout_r,
+                           pout_b=pout_b)
         if (max_dist > 0 and ys[1,0] > max_dist):
             print("Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
