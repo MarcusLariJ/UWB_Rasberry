@@ -237,7 +237,7 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=
         r_noise = np.sqrt(sr)*np.random.randn()
         if not (pout_r==0) and np.random.rand() < pout_r:
             # If the returned unifrom probability is smaller than the threshold, generate an outlier:
-            r_noise*5
+            r_noise = r_noise*5
             print("Range outlier generated") # debug
         r += r_noise
         r = max(r,0) # ranges cannot be smaller than 0
@@ -247,7 +247,7 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=
         b_noise = np.sqrt(sb)*np.random.randn()
         if not (pout_b==0) and np.random.rand() < pout_b:
             # If the returned unifrom probability is smaller than the threshold, generate an outlier:
-            b_noise*5
+            b_noise = b_noise*5
             print("Bearing outlier generated") # debug
         b += b_noise
 
