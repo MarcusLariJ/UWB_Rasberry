@@ -167,7 +167,7 @@ def plot_ANEES(ax: plt.Axes,
               prob=0.95, 
               dt=1, 
               color='blue',
-              thres_c='blue',
+              thres_c='black',
               label='anees'):
     """
     Plots the NEES (Normalized Estimation Error Squared), and plots it along with the confidence bounds
@@ -183,16 +183,17 @@ def plot_ANEES(ax: plt.Axes,
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("ANEES")
     ax.grid()
-    ax.tick_params(direction='in')
+    ax.tick_params(axis='x', direction='in', which='both')
+    ax.tick_params(axis='y', direction='in', which='both')
     ax.set_xlim([0,t[-1]])
 
 def plot_ANIS(ax: plt.Axes,
               nis,
               df,
               dt=1,
-              prob = 95,
+              prob = 0.95,
               color='blue',
-              thres_c='blue',
+              thres_c='black',
               label='anis'):
     """
     Plots the ANIS (Average Normalized innovation squared)
@@ -207,7 +208,42 @@ def plot_ANIS(ax: plt.Axes,
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("ANIS")
     ax.grid()
-    ax.tick_params(direction='in')
+    ax.tick_params(axis='x', direction='in', which='both')
+    ax.tick_params(axis='y', direction='in', which='both')
+    ax.set_xlim([0,t[-1]])
+
+def plot_ANIS_rb(ax: plt.Axes,
+                 nis: np.ndarray,
+                 df: float,
+                 rb_ids: list,
+                 pos_ids: list,
+                 labels: list,
+                 dt: int=1,
+                 prob: float =0.95,
+                 thres_c='black'):
+    """
+    Plots the ANIS for range/bearing. 
+    It colorcodes the readings based on which robot we are making a reading to
+    """
+    anis, t, r1, r2 = rsim.ANIS(nis, df, dt, prob)
+    r1_line = np.ones_like(anis)*r1
+    r2_line = np.ones_like(anis)*r2
+    # Then we sort through the possible ids, and give each a color:
+    N = len(pos_ids)
+    for i in range(N):
+        # Get the indicies:
+        indxs = np.where(rb_ids == pos_ids[i])[0]
+        # Then do a scatterplot:
+        ax.scatter(t[indxs], anis[indxs], label=labels[i], s=5)
+    # Plot the rest
+    ax.plot(t, r1_line, color=thres_c, linestyle='--')
+    ax.plot(t, r2_line, color=thres_c, linestyle='--')
+    ax.set_yscale('log')
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("ANIS")
+    ax.grid()
+    ax.tick_params(axis='x', direction='in', which='both')
+    ax.tick_params(axis='y', direction='in', which='both')
     ax.set_xlim([0,t[-1]])
 
 def plot_abs_avg(ax, 
