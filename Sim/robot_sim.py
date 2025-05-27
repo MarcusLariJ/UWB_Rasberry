@@ -68,6 +68,10 @@ class Robot_single:
         self.nis_rb = np.zeros(self.p_len) # Keeps all recorded RB NIS
         self.rb_ids = np.zeros(self.p_len) # Keeps track of the robot/anchors we communicated with
 
+        # For divergence checking:
+        self.out_num = 0 # increases for each outlier encountered
+
+        # Init models
         self.mot = mf.MotionModel(x0 = x0, dt=dt, P=P, Q=Q)
         self.meas = mf.MeasModel(t=t, R=R)
     
@@ -256,7 +260,7 @@ class robot_luft(Robot_single):
                            pout_r=pout_r,
                            pout_b=pout_b)
         
-        if (max_dist > 0 and ys[1,0] > max_dist):
+        if (max_dist > 0 and ys[2,0] > max_dist):
             print("Anchor " + str(a.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: anchor within range:
@@ -332,7 +336,7 @@ class robot_luft(Robot_single):
                            amb=amb,
                            pout_r=pout_r,
                            pout_b=pout_b)
-        if (max_dist > 0 and ys[1,0] > max_dist):
+        if (max_dist > 0 and ys[2,0] > max_dist):
             print("Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: robot within range:

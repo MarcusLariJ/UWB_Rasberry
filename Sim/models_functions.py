@@ -499,7 +499,6 @@ class MotionModel:
         Returns:
             Updated state covariance
         """
-        # TODO: notice dt here
         Pnew = self._A @ self._P @ np.transpose(self._A) + self._B @ self._Q @ np.transpose(self._B)*self._dt
         self._P = Pnew
         return Pnew
@@ -673,7 +672,7 @@ def KF_rb2(moti: MotionModel,
     ypred = measi.h_rb2(xi, xj, tj)
 
     radian_sel = np.array([[True],[True],[False]]) #TODO: not the best that this is hardcoded
-    R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: #neither is this
+    R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: neither is this
     
     xnew, Pnew, nis, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel, thres=thres)
     moti.x = xnew
@@ -1023,7 +1022,7 @@ def _KF_relative_decen2(moti: MotionModel,
     rad_sel = np.array([[True],[True],[False]]) #TODO: not the best that this is hardcoded
     R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: #neither is this
 
-    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel, thres=thres)
+    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, 10*R, ys, ypred, rad_sel, thres=thres) # TODO: multiplying R with 10, to prioritize this measurements lower than anchors
     #print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
     # Now, split up the results:
     moti.x = xnew[:STATE_LEN, 0:1]
