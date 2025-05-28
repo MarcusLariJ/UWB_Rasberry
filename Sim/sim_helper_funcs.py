@@ -263,7 +263,7 @@ def updateAllLuft(robots: list,
         Each robot attempts to start a measurement chain at the frequency given by update_freq.
         The robots have an offset in when they start a measurement chain, so they are evenly spaced out
         # Params have the shape:
-        [[sr=0, sb=0, thres=0, max_dist=-1, amb=True, meas2=False, pout_r, pout_b],
+        [[sr=0, sb=0, thres_anc=0, thres_rob=0, max_dist=-1, amb=True, meas2_anc=false, meas2_rob=False, pout_r, pout_b],
         ...,
         ...]
     """
@@ -300,19 +300,19 @@ def updateAllLuft(robots: list,
                     # Safety check, in case the last robot is None/self
                     return
             if isinstance(update_list[i][j], rsim.Anchor):
-                if params[i][5]:
+                if params[i][6]:
                     # Use the alternative measurement model:
-                    robots[i].anchor_meas2(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4], params[i][6], params[i][7])
+                    robots[i].anchor_meas2(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][4], params[i][5], params[i][8], params[i][9])
                 else:
                     # Use normal measurement model:
-                    robots[i].anchor_meas(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4], params[i][6], params[i][7])
+                    robots[i].anchor_meas(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][4], params[i][5], params[i][8], params[i][9])
             elif isinstance(update_list[i][j], rsim.robot_luft):
-                if params[i][5]:
+                if params[i][7]:
                     # Use the alternative measurement model:
-                    robots[i].robot_meas_luft2(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4], params[i][6], params[i][7])
+                    robots[i].robot_meas_luft2(update_list[i][j], params[i][0], params[i][1], params[i][3], params[i][4], params[i][5], params[i][8], params[i][9])
                 else:
                     # Use normal measurement model:
-                    robots[i].robot_meas_luft(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][3], params[i][4], params[i][6], params[i][7])
+                    robots[i].robot_meas_luft(update_list[i][j], params[i][0], params[i][1], params[i][3], params[i][4], params[i][5], params[i][8], params[i][9])
             # Update timings
             updateAllLuft.next_time = round(i_indx + exch_time/dt)
             updateAllLuft.j += 1

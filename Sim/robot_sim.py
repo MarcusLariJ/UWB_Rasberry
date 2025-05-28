@@ -194,13 +194,11 @@ class robot_luft(Robot_single):
         """
         Predict one timestep
         """
-        inno = 0
         if self.p_i < self.p_len-1:
             self.mot.predict()
             self.mot.propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
             if imu_correct:
                 nis, _= mf.KF_IMU_rom(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
-
             self.p_i += 1 
         else:
             print("End of trajectory!!")
@@ -261,7 +259,7 @@ class robot_luft(Robot_single):
                            pout_b=pout_b)
         
         if (max_dist > 0 and ys[2,0] > max_dist):
-            print("Anchor " + str(a.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
+            print("(2) Anchor " + str(a.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: anchor within range:
         print("Robot " + str(self.id) + " sees anchor " + str(a.id) + " at time " + str(self.p_i*self.dt))
@@ -337,7 +335,7 @@ class robot_luft(Robot_single):
                            pout_r=pout_r,
                            pout_b=pout_b)
         if (max_dist > 0 and ys[2,0] > max_dist):
-            print("Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
+            print("(2)Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: robot within range:
         print("Robot " + str(self.id) + " sees robot " + str(r.id) + " at time " + str(self.p_i*self.dt))
@@ -366,18 +364,6 @@ class robot_luft(Robot_single):
         self.nis_rb[self.p_i] = nis
         self.rb_ids[self.p_i] = r.id
         return nis
-
-    def robot_meas_rom(self, raa: 'robot_luft', rbb: list, ax = None, sr=0, sb=0):
-        """
-        Function that implements Rom's decentralized CL.
-        Args:
-            raa (robot_luft): The other robot participating in the exchange
-            rbb (list): List of robots not participating in the exchange
-            ax (Axes): plot measurmenet 
-            sr (float): noise on range
-            sb (float): noise on bearing
-        """
-        pass
 
     def recieve_update(self, xnew, Pnew, idj):
         """

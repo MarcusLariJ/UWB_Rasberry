@@ -87,7 +87,6 @@ def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b', draw
         P (np.ndarray): The covariance to plot
     """
     pos = x[X_P, :]
-    Pxy = P[X_P, X_P, :]
     plot_position(ax, np.concatenate((x[X_THETA:X_THETA+1,:], 
                                       x[X_P,:]),axis=0), 
                                       color, 
@@ -96,6 +95,7 @@ def plot_position2(ax: plt.Axes, x: np.ndarray, P: np.ndarray, color = 'b', draw
                                       linestyle=linestyle,
                                       label=label)
     if P is not None:
+        Pxy = P[X_P, X_P, :]
         for i in range(P.shape[2]):
             plot_variance_ellipse(ax, Pxy[:,:,i], pos[:,i], color=color, linestyle=linestyle)
 
