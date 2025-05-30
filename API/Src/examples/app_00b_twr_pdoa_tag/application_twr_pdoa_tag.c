@@ -212,7 +212,7 @@ int application_twr_pdoa_tag(void)
 	my_ID[1] = device_id >> 16 & 0xFF;
 	print_hex(my_ID, 2);
 	/*This hacky code is a way to make sure that the devices own ID dosent appear with the other IDs*/
-	uint8_t known_IDs[] = {0xD6, 0xC2, 0x16, 0xC2};
+	uint8_t known_IDs[] = {0x96, 0xC2, 0x16, 0xC2};
 	uint8_t device_num = 1; // current number of known devices
 	uint8_t device_crt = 0; // the current index of device
 	uint8_t your_ID[2]; // expected address of incoming message
