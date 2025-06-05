@@ -1,6 +1,7 @@
 import pickle 
 import numpy as np
 import os
+import gzip
 
 class RobotData():
     """
@@ -36,20 +37,20 @@ class RobotCollection():
 def save_data(obj: RobotCollection, filename):
     folder = "dataSim"
     os.makedirs(folder, exist_ok=True)  # Create the folder if it doesn't exist
-    filepath = os.path.join(folder, filename + ".pickle")
+    filepath = os.path.join(folder, filename + ".pkl.gz")
     
     try:
-        with open(filepath, "wb") as f:
+        with gzip.open(filepath, "wb") as f:
             pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
     except Exception as ex:
         print("Error during pickling object (Possibly unsupported):", ex)
 
 def load_object(filename):
     folder = "dataSim"
-    filepath = os.path.join(folder, filename + ".pickle")
+    filepath = os.path.join(folder, filename + ".pkl.gz")
 
     try:
-        with open(filepath, "rb") as f:
+        with gzip.open(filepath, "rb") as f:
             return pickle.load(f)
     except Exception as ex:
         print("Error during unpickling object (Possibly unsupported):", ex)

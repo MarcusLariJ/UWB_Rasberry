@@ -300,19 +300,9 @@ def updateAllLuft(robots: list,
                     # Safety check, in case the last robot is None/self
                     return
             if isinstance(update_list[i][j], rsim.Anchor):
-                if params[i][6]:
-                    # Use the alternative measurement model:
-                    robots[i].anchor_meas2(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][4], params[i][5], params[i][8], params[i][9])
-                else:
-                    # Use normal measurement model:
-                    robots[i].anchor_meas(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][4], params[i][5], params[i][8], params[i][9])
+                robots[i].anchor_meas(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][4], params[i][5], params[i][6], params[i][8], params[i][9])
             elif isinstance(update_list[i][j], rsim.robot_luft):
-                if params[i][7]:
-                    # Use the alternative measurement model:
-                    robots[i].robot_meas_luft2(update_list[i][j], params[i][0], params[i][1], params[i][3], params[i][4], params[i][5], params[i][8], params[i][9])
-                else:
-                    # Use normal measurement model:
-                    robots[i].robot_meas_luft(update_list[i][j], params[i][0], params[i][1], params[i][3], params[i][4], params[i][5], params[i][8], params[i][9])
+                robots[i].robot_meas(update_list[i][j], params[i][0], params[i][1], params[i][3], params[i][4], params[i][5], params[i][7], params[i][8], params[i][9])
             # Update timings
             updateAllLuft.next_time = round(i_indx + exch_time/dt)
             updateAllLuft.j += 1
