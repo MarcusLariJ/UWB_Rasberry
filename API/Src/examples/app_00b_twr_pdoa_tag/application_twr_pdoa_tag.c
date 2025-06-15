@@ -195,10 +195,7 @@ int application_twr_pdoa_tag(void)
     /* Install DW IC IRQ handler. */
     port_set_dwic_isr(dwt_isr);
 
-    /* Enable IC diagnostic calculation and logging */
-    dwt_configciadiag(DW_CIA_DIAG_LOG_ALL); //maybe delete this 
-
-	/* Activate reception immediately. */
+	/* Activate reception immediately (as we start out as an anchor). */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
     uint8_t timestamp_buffer[5];
@@ -750,6 +747,8 @@ int application_twr_pdoa_tag(void)
 				tx_done = 0;
 				rx_done = 0;
 				state = TWR_SYNC_STATE_TAG;
+
+				Sleep(100); // short pause after succesful exchange
 			}
 			break;
 		case TWR_ERROR_TAG:

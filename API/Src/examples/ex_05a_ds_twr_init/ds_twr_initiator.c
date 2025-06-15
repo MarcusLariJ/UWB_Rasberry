@@ -157,7 +157,7 @@ int ds_twr_initiator(void)
     /* Next can enable TX/RX states output on GPIOs 5 and 6 to help debug, and also TX/RX LEDs
      * Note, in real low power applications the LEDs should not be used. */
     dwt_setlnapamode(DWT_LNA_ENABLE | DWT_PA_ENABLE);
-    //dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);
+    dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);
 
     /* Loop forever initiating ranging exchanges. */
     while (1)
