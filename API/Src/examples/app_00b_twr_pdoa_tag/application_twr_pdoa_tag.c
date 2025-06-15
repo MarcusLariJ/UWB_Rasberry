@@ -34,6 +34,8 @@
 #define TX_ANT_DLY 16385
 #define RX_ANT_DLY 16385
 
+extern dwt_txconfig_t txconfig_options;
+
 static void tx_done_cb(const dwt_cb_data_t *cb_data);
 static void rx_ok_cb(const dwt_cb_data_t *cb_data);
 static void rx_err_cb(const dwt_cb_data_t *cb_data);
@@ -175,6 +177,10 @@ int application_twr_pdoa_tag(void)
         { };
     }
 
+	// configure transmit power and pulse delay
+	dwt_configuretxrf(&txconfig_options);
+
+	// apply antenna delays
 	dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
 

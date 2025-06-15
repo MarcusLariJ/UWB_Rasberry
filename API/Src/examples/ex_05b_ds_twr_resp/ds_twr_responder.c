@@ -85,7 +85,7 @@ static uint32_t status_reg = 0;
  * frame length of approximately 190 us with above configuration. */
 #define POLL_RX_TO_RESP_TX_DLY_UUS 900
 /* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW IC's wait for response feature. */
-#define RESP_TX_TO_FINAL_RX_DLY_UUS 500
+#define RESP_TX_TO_FINAL_RX_DLY_UUS 100 // from 500
 /* Receive final timeout. See NOTE 5 below. */
 #define FINAL_RX_TIMEOUT_UUS 420
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
@@ -153,7 +153,7 @@ int ds_twr_responder(void)
 
     /* Next can enable TX/RX states output on GPIOs 5 and 6 to help debug, and also TX/RX LEDs
      * Note, in real low power applications the LEDs should not be used. */
-    dwt_setlnapamode(DWT_LNA_ENABLE | DWT_PA_ENABLE);
+    //dwt_setlnapamode(DWT_LNA_ENABLE | DWT_PA_ENABLE);
     dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);
 
     /* Loop forever responding to ranging requests. */
