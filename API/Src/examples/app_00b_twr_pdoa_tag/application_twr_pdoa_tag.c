@@ -128,7 +128,7 @@ enum state_t state = TWR_SYNC_STATE_ANC;
 uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
-static const uint64_t round_tx_delay = 900llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
+static const uint64_t round_tx_delay = 1000llu*US_TO_DWT_TIME;  // reply time (0.7ms) now 10 ms
 static const unsigned int tag_sync_timeout = 10; // (10 ms) 100 ms
 static const unsigned int anc_resp_timeout = 10; // slightly smaller than sync timeout
 static const unsigned int min_tx_timeout = 5; // min timout value
