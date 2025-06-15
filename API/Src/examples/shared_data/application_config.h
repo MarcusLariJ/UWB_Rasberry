@@ -23,7 +23,7 @@ static dwt_config_t config = {
     DWT_PHRRATE_STD,  /* PHY header rate. */
     (129 + 8 - 8),     /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
     DWT_STS_MODE_1 | DWT_STS_MODE_SDC,   /* STS directly after SFD and supporting data (STS Mode 1). Deterministic (insecure) STS. */
-    DWT_STS_LEN_128,  /* STS length (needs to be a multiple of 128 to support more accurate PDoA mode 3 */
+    DWT_STS_LEN_256,  /* STS length (needs to be a multiple of 128 to support more accurate PDoA mode 3 */
 	DWT_PDOA_M3       /* PDOA mode 3 */
 };
 
