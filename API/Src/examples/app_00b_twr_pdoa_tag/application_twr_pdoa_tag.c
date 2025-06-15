@@ -30,6 +30,10 @@
 #define FORCE_ANCHOR 1 // Force the device to be an anchor and never enter tag mode
 #define FORCE_TAG 0 // Force the device to be a tag
 
+// antenna delays for calibration
+#define TX_ANT_DLY 16385
+#define RX_ANT_DLY 16385
+
 static void tx_done_cb(const dwt_cb_data_t *cb_data);
 static void rx_ok_cb(const dwt_cb_data_t *cb_data);
 static void rx_err_cb(const dwt_cb_data_t *cb_data);
@@ -171,6 +175,9 @@ int application_twr_pdoa_tag(void)
         { };
     }
 
+	dwt_setrxantennadelay(RX_ANT_DLY);
+    dwt_settxantennadelay(TX_ANT_DLY);
+
     printf("CONFIGURED\n");
 
     /* Register RX call-back. */
@@ -240,19 +247,6 @@ int application_twr_pdoa_tag(void)
 
 	while (1)
 	{
-		/* check ranging timeout and restart ranging if necessary  */
-		/*
-		if (tag_mode && (millis() - last_sync_time) > ranging_timeout) { 
-			printf("Timeout -> reset\n");
-			last_sync_time = millis();
-			state = TWR_ERROR_TAG; 
-			rx_timestamp_poll = 0; // maybe delete all this
-			tx_timestamp_response = 0;
-			rx_timestamp_final = 0;
-			tx_done = 0;
-			rx_done = 0;
-		} */
-
 		switch (state) {
 		
 		/*		------------------------------------------------- ANCHOR CODE -------------------------------------------------	 */
@@ -442,7 +436,7 @@ int application_twr_pdoa_tag(void)
 				memcpy(final_frame.dst_address, your_ID, 2);
 				final_frame.sequence_number = next_sequence_number++;
 
-				tx_timestamp_final = rx_timestamp_response + round_tx_delay;
+				tx_timestamp_final = rx_timestamp_response + round_tx_delay + TX_ANT_DLY; // inclue antenna delay in final timestamp
 
 				uint64_t Tround1 = rx_timestamp_response - tx_timestamp_poll;
 				uint64_t Treply2 = tx_timestamp_final - rx_timestamp_response;
@@ -464,7 +458,9 @@ int application_twr_pdoa_tag(void)
 
 				/* Start transmission at the time we embedded into the message */
 				state = TWR_FINAL_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
-				dwt_setdelayedtrxtime(tx_timestamp_final >> 8);
+				
+				uint32_t final_tx_time = (rx_timestamp_response + round_tx_delay) >> 8;
+				dwt_setdelayedtrxtime(final_tx_time);
 				int r = dwt_starttx(DWT_START_RX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
 					printf("TX ERR: delayed send time missed");
@@ -627,7 +623,9 @@ int application_twr_pdoa_tag(void)
 
 				// Send response after a fixed delay
 				state = TWR_FINAL_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
-				dwt_setdelayedtrxtime((uint32_t)((rx_timestamp_poll + round_tx_delay) >> 8));
+
+				uint32_t resp_tx_time = (rx_timestamp_poll + round_tx_delay) >> 8;
+				dwt_setdelayedtrxtime(resp_tx_time);
 				int r = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
 					printf("TX ERR: delayed send time missed\n");

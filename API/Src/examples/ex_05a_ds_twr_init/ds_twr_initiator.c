@@ -86,7 +86,7 @@ static uint32_t status_reg = 0;
 #define POLL_TX_TO_RESP_RX_DLY_UUS 700
 /* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW IC's delayed TX function. This includes the
  * frame length of approximately 190 us with above configuration. */
-#define RESP_RX_TO_FINAL_TX_DLY_UUS 700
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 900 // before 700
 /* Receive response timeout. See NOTE 5 below. */
 #define RESP_RX_TIMEOUT_UUS 300
 /* Preamble timeout, in multiple of PAC size. See NOTE 7 below. */
