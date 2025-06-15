@@ -13,17 +13,17 @@
 /* Communication configuration (enabling STS mode 1 makes this incompatible with the DW1000!). */
 static dwt_config_t config = {
     5,                /* Channel number. */
-	DWT_PLEN_64,      /* Preamble length. Used in TX only. */
+	DWT_PLEN_128,     /* Preamble length. Used in TX only. */
     DWT_PAC8,         /* Preamble acquisition chunk size. Used in RX only. */
     9,                /* TX preamble code. Used in TX only. */
     9,                /* RX preamble code. Used in RX only. */
-    0,                /* 0 to use standard 8 symbol SFD, 1 to use non-standard 8 symbol, 2 for non-standard 16 symbol SFD and 3 for 4z 8 symbol SDF type */
+    1,                /* 0 to use standard 8 symbol SFD, 1 to use non-standard 8 symbol, 2 for non-standard 16 symbol SFD and 3 for 4z 8 symbol SDF type */
     DWT_BR_6M8,       /* Data rate. */
     DWT_PHRMODE_STD,  /* PHY header mode. */
     DWT_PHRRATE_STD,  /* PHY header rate. */
-    (65 + 8 - 8),     /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
+    (129 + 8 - 8),     /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
     DWT_STS_MODE_1 | DWT_STS_MODE_SDC,   /* STS directly after SFD and supporting data (STS Mode 1). Deterministic (insecure) STS. */
-    DWT_STS_LEN_128,  /* STS length (needs to be a multiple of 128 to support more accurate PDoA mode 3 */
+    DWT_STS_LEN_256,  /* STS length (needs to be a multiple of 128 to support more accurate PDoA mode 3 */
 	DWT_PDOA_M3       /* PDOA mode 3 */
 };
 

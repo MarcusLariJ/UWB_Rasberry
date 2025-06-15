@@ -121,7 +121,7 @@ int ds_twr_initiator(void)
     /* Reset DW IC */
     reset_DWIC(); /* Target specific drive of RSTn line into DW IC low for a period. */
 
-    Sleep(2); // Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC
+    Sleep(20); // Time needed for DW3000 to start up (transition from INIT_RC to IDLE_RC
 
     while (!dwt_checkidlerc()) /* Need to make sure DW IC is in IDLE_RC before proceeding */
     { };
