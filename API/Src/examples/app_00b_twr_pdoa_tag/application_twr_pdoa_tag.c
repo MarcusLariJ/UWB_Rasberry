@@ -31,8 +31,8 @@
 #define FORCE_TAG 0 // Force the device to be a tag
 
 // antenna delays for calibration
-#define TX_ANT_DLY (16385-60)
-#define RX_ANT_DLY (16385-60)
+#define TX_ANT_DLY (16385-45)
+#define RX_ANT_DLY (16385-45)
 
 extern dwt_txconfig_t txconfig_options;
 
@@ -108,6 +108,7 @@ int16_t pdoa_tx = 0;
 uint8_t tdoa_rx[5];
 
 uint8_t next_sequence_number = 0;
+float dist_sum = 0;
 
 // unique chip ID of the decawace chip. Used for identification
 const uint16_t CHIPID_ADDR = 0x06;
@@ -743,7 +744,9 @@ int application_twr_pdoa_tag(void)
 				transmit_rx_diagnostics(current_rotation, pdoa_rx, pdoa_tx, tdoa_rx); // log true rotation, measured pdoa and tdoa
 
 				/* Transmit human readable for debugging */
-				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_m: %.2f\n", twr_count, ((float)dist_mm)/1000);
+				dist_sum += dist_mm;
+				float dist_mean = dist_sum/(twr_count*1000); // mean distance in meters
+				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_m: %.2f, mean dist: %.2f \n", twr_count, ((float)dist_mm)/1000, dist_mean);
 				printf(print_buffer);
 
 				/* Rotate receiver */
