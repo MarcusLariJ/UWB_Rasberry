@@ -553,8 +553,7 @@ def _KF_ml(x: np.ndarray,
        R: np.ndarray, 
        ys: np.ndarray,
        ypred: np.ndarray,
-       radian_sel: np.ndarray,
-       thres: float = 0):
+       radian_sel: np.ndarray):
     """
     Computes the Kalman gain and updates the states and covariance.
     Includes the ML (now MD) step
@@ -569,13 +568,8 @@ def _KF_ml(x: np.ndarray,
     Sinv = np.linalg.inv(S)
     # Run ML step:
     r_sel = radian_sel
-    #y, ml = ML_rb_gen(ys, ypred, S, r_sel)
     y, nis = MD_rb_gen(ys, ypred, Sinv, r_sel)
     # filter out unlikely measurements
-    if thres > 0 and nis > thres:
-        print("Measurement rejected: MD of " + str(nis[0,0]))
-        K_dummy = np.zeros((x.shape[0], ys.shape[0]))
-        return x, P, nis[0,0], K_dummy 
 
     # Then carry on with the Kalman Filter
     inno = subtractState(y, ypred, r_sel)
@@ -607,7 +601,10 @@ def KF_IMU(mot: MotionModel, meas: MeasModel, y: np.ndarray, thres: float = 0) -
     R = meas.R[Z_W:,Z_W:] # Only use noise related to IMU
     ypred = meas.h_IMU(x)
     radian_sel = meas.radian_sel[Z_W:]
-    xnew, Pnew, nis, K = _KF_ml(x, P, H, R, y, ypred, radian_sel, thres=thres) # only for filtering outliers TODO: not very efficient 
+    xnew, Pnew, nis, K = _KF_ml(x, P, H, R, y, ypred, radian_sel) # only for filtering outliers TODO: not very efficient 
+    if thres > 0 and nis > thres:
+        print("NIS too large. Skipping IMU update")
+        return nis, K, H
     mot.x = xnew
     mot.P = Pnew
 
@@ -639,7 +636,10 @@ def KF_rb(moti: MotionModel,
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing:
     ypred = measi.h_rb(xi, xj, tj)
     radian_sel = measi.radian_sel[:Z_W]
-    xnew, Pnew, nis, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel, thres=thres)
+    xnew, Pnew, nis, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel)
+    if thres > 0 and nis > thres:
+        print("NIS too large. Skipping RB update")
+        return nis, K, H
     moti.x = xnew
     moti.P = Pnew
 
@@ -674,7 +674,10 @@ def KF_rb2(moti: MotionModel,
     radian_sel = np.array([[True],[True],[False]]) #TODO: not the best that this is hardcoded
     R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: neither is this
     
-    xnew, Pnew, nis, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel, thres=thres)
+    xnew, Pnew, nis, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel)
+    if thres > 0 and nis > thres:
+        print("NIS too large. Skipping RB2 update")
+        return nis, K, H
     moti.x = xnew
     moti.P = Pnew
 
@@ -712,7 +715,10 @@ def KF_rb_ext(moti: MotionModel,
     radian_sel = measi.radian_sel[:Z_W]
     # Append both state vectors to get x:
     x = np.append(xi, xj, axis=0)
-    xnew, Pnew, nis, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel, thres=thres)
+    xnew, Pnew, nis, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel)
+    if thres > 0 and nis > thres:
+        print("NIS too large. Skipping RB_ext2 update")
+        return nis, K, H
     moti.x = xnew[:STATE_LEN,:] # Update xi
     motj.x = xnew[STATE_LEN:,:] # Update xj
     moti.P = Pnew[:STATE_LEN, :STATE_LEN] # Update Pii
@@ -755,48 +761,16 @@ def KF_rb_ext2(moti: MotionModel,
 
     # Append both state vectors to get x:
     x = np.append(xi, xj, axis=0)
-    xnew, Pnew, nis, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel, thres=thres)
+    xnew, Pnew, nis, K = _KF_ml(x, P, H, R, ys, ypred, radian_sel)
+    if thres > 0 and nis > thres:
+        print("NIS too large. Skipping RB2_ext update")
+        return nis, K, H
     moti.x = xnew[:STATE_LEN,:] # Update xi
     motj.x = xnew[STATE_LEN:,:] # Update xj
     moti.P = Pnew[:STATE_LEN, :STATE_LEN] # Update Pii
     motj.P = Pnew[STATE_LEN:,STATE_LEN:] # Update Pjj
 
     return nis, K, H
-
-def KF_full(moti: MotionModel, 
-            motj: MotionModel, 
-            measi: MeasModel,
-            measj: MeasModel, 
-            ys: np.ndarray,
-            thres=0) -> np.ndarray:
-    """
-    KF for both IMU for robot i and range/bearing measurement between robot i and j
-    Args:
-        moti (MotionModel): Motion model of the ego robot i 
-        motj (MotionModel): Motion model of the other robot j
-        measi (MeasModel): Measurement model of the robot i
-        measj (MeasModel): Meadurement model of the robot j
-        y (np.ndarray): Incoming measurement
-    Returns:
-        inno (np.ndarray): Innovation
-        K (np.ndarray): Kalman gain vector
-    """
-    # TODO: delete
-    print("Don't use this")
-    xi = moti.x
-    xj = motj.x
-    tj = measj.t
-    P = moti.P
-    H = measi.get_jacobian_full(xi, xj, tj)
-    R = measi.R
-    ypred = measi.h_full(xi, xj, tj)
-    radian_sel = measi.radian_sel
-    xnew, Pnew, inno, K = _KF_ml(xi, P, H, R, ys, ypred, radian_sel, thres=thres)
-    moti.x = xnew
-    moti.P = Pnew
-
-    return inno, K
-
 
 #### KF for collaborative localization ####
 
@@ -861,6 +835,9 @@ def KF_IMU_rom(mot: MotionModel,
     """
     # Run normal KF IMU 
     nis, K, H = KF_IMU(mot, meas, y, thres=thres)
+    if thres > 0 and nis > thres:
+        print("NIS too large: Skipping private update")
+        return nis, K
     # Update correlations between robots
     rom_private(K, H, cor_list, cor_num)
 
@@ -948,8 +925,6 @@ def _KF_relative_decen(moti: MotionModel,
     else: 
         idx = id_list[idj]
         Pij = cor_list[:,:,idx] @ sigmaji.T
-    # DEBUG:
-    #Pij = np.zeros((STATE_LEN, STATE_LEN)) # DEBUG: always set to zero, to see if correlations cause problems
     # Put together Paa matrix:
     Pii = moti.P
     Paa = np.zeros((STATE_LEN*2, STATE_LEN*2))
@@ -967,8 +942,10 @@ def _KF_relative_decen(moti: MotionModel,
     ypred = measi.h_rb(moti.x, xj, tj)
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing
     rad_sel = measi.radian_sel[:Z_W]
-    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel, thres=thres)
-    #print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
+    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel)
+    if thres > 0 and nis > thres:
+        print("NIS too large. Skipping DECEN update")
+        return xj, Pii, Pii, Pjj, cor_num, nis, K
     # Now, split up the results:
     moti.x = xnew[:STATE_LEN, 0:1]
     xj_new = xnew[STATE_LEN:, 0:1]
@@ -1001,8 +978,6 @@ def _KF_relative_decen2(moti: MotionModel,
     else: 
         idx = id_list[idj]
         Pij = cor_list[:,:,idx] @ sigmaji.T
-    # DEBUG:
-    #Pij = np.zeros((STATE_LEN, STATE_LEN)) # DEBUG: always set to zero, to see if correlations cause problems
     # Put together Paa matrix:
     Pii = moti.P
     Paa = np.zeros((STATE_LEN*2, STATE_LEN*2))
@@ -1023,8 +998,10 @@ def _KF_relative_decen2(moti: MotionModel,
     R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: #neither is this
 
     xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, 10*R, ys, ypred, rad_sel, thres=thres) # TODO: multiplying R with 10, to prioritize this measurements lower than anchors
-    #print(np.linalg.eig(Pnew)[0]) # DEBUG: Check when the matrix is no longer pd
     # Now, split up the results:
+    if thres > 0 and nis > thres:
+        print("NIS too large. Skipping DECEN update")
+        return xj, Pii, Pii, Pjj, cor_num, nis, K
     moti.x = xnew[:STATE_LEN, 0:1]
     xj_new = xnew[STATE_LEN:, 0:1]
     Pii_new = Pnew[:STATE_LEN, :STATE_LEN]
@@ -1045,7 +1022,8 @@ def KF_relative_luft(moti: MotionModel,
             id_list: dict,
             cor_list: np.ndarray,
             cor_num: int,
-            thres=0):
+            thres=0,
+            meas2=False):
     """
     Luft et als algorithm, that approximates inter-robot correlations for non-participating robots
     Args:
@@ -1067,91 +1045,39 @@ def KF_relative_luft(moti: MotionModel,
         K (np.ndarray): Kalman gain vector
     """
     # first, perform the first part of the algorithm:
-    xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K = _KF_relative_decen(moti, 
-                                                                        measi, 
-                                                                        idj, 
-                                                                        xj, 
-                                                                        Pjj, 
-                                                                        sigmaji, 
-                                                                        tj, 
-                                                                        ys, 
-                                                                        id_list, 
-                                                                        cor_list, 
-                                                                        cor_num,
-                                                                        thres=thres)
+    if meas2:
+        xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K = _KF_relative_decen2(moti, 
+                                                                            measi, 
+                                                                            idj, 
+                                                                            xj, 
+                                                                            Pjj, 
+                                                                            sigmaji, 
+                                                                            tj, 
+                                                                            ys, 
+                                                                            id_list, 
+                                                                            cor_list, 
+                                                                            cor_num,
+                                                                            thres=thres)
+    else:
+        xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K = _KF_relative_decen(moti, 
+                                                                            measi, 
+                                                                            idj, 
+                                                                            xj, 
+                                                                            Pjj, 
+                                                                            sigmaji, 
+                                                                            tj, 
+                                                                            ys, 
+                                                                            id_list, 
+                                                                            cor_list, 
+                                                                            cor_num,
+                                                                            thres=thres)
     # Finally, approximate inter-robot correlations
+    if thres > 0 and nis > thres:
+        print("Skipping relative update")
+        return xj_new, Pjj_new, cor_num, nis, K 
     luft_relative(Pii_new, Pii, idj, id_list, cor_list)
-    #TODO: check if id_list and cor_list gets updated correctly
     # xj_new and Pjj_new should be transmitted to the other robot
     return xj_new, Pjj_new, cor_num, nis, K 
-
-def KF_relative_luft2(moti: MotionModel,  
-            measi: MeasModel,
-            idj: int,
-            xj: np.ndarray,
-            Pjj: np.ndarray,
-            sigmaji: np.ndarray,
-            tj: np.ndarray,
-            ys: np.ndarray,
-            id_list: dict,
-            cor_list: np.ndarray,
-            cor_num: int,
-            thres=0):
-    """
-    Luft et als algorithm, that approximates inter-robot correlations for non-participating robots
-    For when we have access to AoA and AoD
-    Args:
-        moti (MotionModel): Motion model of the ego robot i 
-        measi (MeasModel): Measurement model of the robot i
-        idj (int): id of other robot j
-        xj (np.ndarray): State vector of other robot j
-        Pjj (np.ndarray): Covariance of other robot j
-        sigmaji (np.ndarray): correlation to other robot j
-        y (np.ndarray): Incoming measurement
-        id_list (dict): List of ids
-        cor_list (np.ndarray): List of inter-robot correlations
-        cor_num (int): length of list 
-    Returns:
-        xj_new (np.ndarray): New xj
-        Pjj_new (np.ndarray): new Pjj. Use to update robot j
-        cor_num (int): new length of list
-        inno (np.ndarray): Innovation
-        K (np.ndarray): Kalman gain vector
-    """
-    # first, perform the first part of the algorithm:
-    xj_new, Pii_new, Pii, Pjj_new, cor_num, nis, K = _KF_relative_decen2(moti, 
-                                                                        measi, 
-                                                                        idj, 
-                                                                        xj, 
-                                                                        Pjj, 
-                                                                        sigmaji, 
-                                                                        tj, 
-                                                                        ys, 
-                                                                        id_list, 
-                                                                        cor_list, 
-                                                                        cor_num,
-                                                                        thres=thres)
-    # Finally, approximate inter-robot correlations
-    luft_relative(Pii_new, Pii, idj, id_list, cor_list)
-    #TODO: check if id_list and cor_list gets updated correctly
-    # xj_new and Pjj_new should be transmitted to the other robot
-    return xj_new, Pjj_new, cor_num, nis, K 
-
-def KF_relative_rom(moti: MotionModel,  
-            measi: MeasModel,
-            idj: int,
-            xj: np.ndarray,
-            Pjj: np.ndarray,
-            sigmaji: np.ndarray,
-            tj: np.ndarray,
-            ys: np.ndarray,
-            id_list: dict,
-            cor_list: np.ndarray,
-            cor_num: int):
-    """
-    Roumeliotis et als algorithm, that uses the exact inter-robot correlations
-    """
-    pass
 
 def recieve_meas(moti: MotionModel,
                 idj: int,
@@ -1199,6 +1125,16 @@ def request_meas(mot: MotionModel,
         sigmaij = cor_list[:,:,idx]
     
     return xi, Pii, sigmaij, cor_num
+
+def inflate_P(mot: MotionModel, cor: np.ndarray, cor_len: int, a: float):
+    """
+    Scales the covariance and correlations with a factor 'a'.
+    Can be used to reset the filter, in case it diverges too much
+    """
+    mot.P = mot.P*(a**2)
+    for i in range(cor_len):
+        cor[:,:,i] = a*cor[:,:,i] # the sqrt of the scaling on P
+    return
 
 #### ML and MD estimators ####
 
