@@ -85,6 +85,8 @@ def gen_circ_traj_norot(R, N, dt=1, theta0=0, xc=0, yc=0, ccw = False):
 
     return trajectory, IMU_meas, x0
 
+### Functions for generating noisy trajectories
+
 def gen_poly_traj(  x0: np.ndarray, 
                     xf: np.ndarray, 
                     t0: float, 
@@ -203,6 +205,54 @@ def gen_noise(y: np.ndarray, bias: np.ndarray = None, sigma: np.ndarray = None, 
         bias_v = np.repeat(bias, y_len, axis=1)
         y += bias_v
     return y
+
+### Funcations for generating fake angles:
+
+def pdoa2ang(a):
+    # Function for converting pdoa to angle - including all the possible ambiguities
+    
+    d = 0.026 # 0.0231      # Distance between antennas
+    f = 6.4896e9    # frequency
+    c = 299792458   # speed of light
+    lam = c/f       # wavelength
+
+    # The two thresholds
+    rupp = -(2*np.pi*d)/lam + 2*np.pi
+    rlow = (2*np.pi*d)/lam - 2*np.pi
+
+    ang1 = np.arcsin((a*lam)/(2*np.pi*d))
+    
+    if a >= rupp:
+        ang2 = np.arcsin(((a-2*np.pi)*lam)/(2*np.pi*d))
+    elif a <= rlow:
+        ang2 = np.arcsin(((a+2*np.pi)*lam)/(2*np.pi*d))
+    else:
+        # Simple case of only two ambiguities:
+        mang = np.zeros(2)
+        mang[0] = ang1
+        mang[1] = mf.normalize_angle(np.pi - ang1)
+
+        return mang
+    # More advanced case of four ambiguities:
+
+    mang = np.zeros(4)
+    mang[0] = ang1
+    mang[1] = ang2
+    mang[2] = mf.normalize_angle(np.pi - ang1)
+    mang[3] = mf.normalize_angle(np.pi - ang2)
+
+    return mang
+
+def gen_adv_amb(a):
+    
+    d = 0.026 # 0.0231      # Distance between antennas
+    f = 6.4896e9    # frequency
+    c = 299792458   # speed of light
+    lam = c/f       # wavelength
+    
+    pdoa = mf.normalize_angle(np.sin(a)*(2*np.pi*d)/(lam)) # First generate the equivalent pdoa
+    mang = pdoa2ang(pdoa) # Then all the ambiguities
+    return mang # Return up to four ambiguities
 
 def gen_rb(thetai, thetaj, posi, posj, ti, tj):
     """

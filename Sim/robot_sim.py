@@ -211,12 +211,13 @@ class robot_luft(Robot_single):
 
         return nis
     
-    def anchor_meas(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True, pout_r=0, pout_b=0):
+    def anchor_meas(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True, meas2=False, pout_r=0, pout_b=0):
         """
         Make measurement to anchor and use Rom methods for updating correlations
         """
         # Get ambigious measurement
-        ys = traj.gen_rb_amb(self.path[0,self.p_i], 
+        if meas2:
+            ys = traj.gen_rb2_amb(self.path[0,self.p_i], 
                            a.x[mf.X_THETA, 0], 
                            self.path[1:3, self.p_i:self.p_i+1], 
                            a.x[mf.X_P],
@@ -227,13 +228,34 @@ class robot_luft(Robot_single):
                            amb=amb,
                            pout_r=pout_r,
                            pout_b=pout_b)
-        
-        if (max_dist > 0 and ys[1,0] > max_dist):
+        else:
+                    ys = traj.gen_rb_amb(self.path[0,self.p_i], 
+                           a.x[mf.X_THETA, 0], 
+                           self.path[1:3, self.p_i:self.p_i+1], 
+                           a.x[mf.X_P],
+                           self.t,
+                           a.t,
+                           sr=sr,
+                           sb=sb,
+                           amb=amb,
+                           pout_r=pout_r,
+                           pout_b=pout_b)
+
+        if (max_dist > 0 and ys[-1,0] > max_dist):
             print("Anchor " + str(a.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: anchor within range:
         print("Robot " + str(self.id) + " sees anchor " + str(a.id) + " at time " + str(self.p_i*self.dt))
-        nis, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
+        if meas2:
+            nis, _ = mf.KF_rb_rom2(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
+        else:
+            nis, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
+        # Update number of outliers:
+        if thres > 0 and nis > thres:
+            self.out_num = min(self.out_num+1, 20)
+            print("Num of outliers increased to " + str(self.out_num))
+        else:
+            self.out_num = max(self.out_num-1, 0)
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
@@ -241,42 +263,25 @@ class robot_luft(Robot_single):
         self.rb_ids[self.p_i] = a.id
         return nis
     
-    def anchor_meas2(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True, pout_r=0, pout_b=0):
-        """
-        Make measurement to anchor and use Rom methods for updating correlations
-        """
-        # Get ambigious measurement
-        ys = traj.gen_rb2_amb(self.path[0,self.p_i], 
-                           a.x[mf.X_THETA, 0], 
-                           self.path[1:3, self.p_i:self.p_i+1], 
-                           a.x[mf.X_P],
-                           self.t,
-                           a.t,
-                           sr=sr,
-                           sb=sb,
-                           amb=amb,
-                           pout_r=pout_r,
-                           pout_b=pout_b)
-        
-        if (max_dist > 0 and ys[2,0] > max_dist):
-            print("(2) Anchor " + str(a.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
-            return None
-        # Else: anchor within range:
-        print("Robot " + str(self.id) + " sees anchor " + str(a.id) + " at time " + str(self.p_i*self.dt))
-        nis, _ = mf.KF_rb_rom2(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
-        # Log updated quantities:        
-        self.x_log[:,self.p_i:self.p_i+1] = self.x
-        self.P_log[:,:,self.p_i] = self.P
-        self.nis_rb[self.p_i] = nis
-        self.rb_ids[self.p_i] = a.id
-        return nis
-
-    def robot_meas_luft(self, r: 'robot_luft', sr=0, sb=0, thres=0, max_dist=-1, amb=True, pout_r=0, pout_b=0):
+    def robot_meas(self, r: 'robot_luft', sr=0, sb=0, thres=0, max_dist=-1, amb=True, meas2=False, pout_r=0, pout_b=0):
         """
         Implements Lufts et al algorithm for CL localization
         """
         # Get ambigious measurement
-        ys = traj.gen_rb_amb(self.path[0,self.p_i], 
+        if meas2:
+            ys = traj.gen_rb2_amb(self.path[0,self.p_i], 
+                            r.path[0,r.p_i], 
+                            self.path[1:3, self.p_i:self.p_i+1], 
+                            r.path[1:3, r.p_i:r.p_i+1],
+                            self.t,
+                            r.t,
+                            sr=sr,
+                            sb=sb,
+                            amb=amb,
+                            pout_r=pout_r,
+                            pout_b=pout_b)
+        else:
+            ys = traj.gen_rb_amb(self.path[0,self.p_i], 
                            r.path[0,r.p_i], 
                            self.path[1:3, self.p_i:self.p_i+1], 
                            r.path[1:3, r.p_i:r.p_i+1],
@@ -287,7 +292,7 @@ class robot_luft(Robot_single):
                            amb=amb,
                            pout_r=pout_r,
                            pout_b=pout_b)
-        if (max_dist > 0 and ys[1,0] > max_dist):
+        if (max_dist > 0 and ys[-1,0] > max_dist):
             print("Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
             return None
         # Else: robot within range:
@@ -306,10 +311,18 @@ class robot_luft(Robot_single):
                                                                 self.id_list,
                                                                 self.s_list,
                                                                 self.id_num,
-                                                                thres=thres)
+                                                                thres=thres,
+                                                                meas2=meas2)
         self.id_num = cor_num
-        # send updated quantities back to j
-        r.recieve_update(xj_new, Pjj_new, self.id)
+        # Update number of outliers:
+        if thres > 0 and nis > thres:
+            self.out_num = min(self.out_num+1, 20)
+            print("Num of outliers increased to " + str(self.out_num))
+            # Dont send updated quantities back
+        else:
+            self.out_num = max(self.out_num-1, 0)
+            # send updated quantities back to j
+            r.recieve_update(xj_new, Pjj_new, self.id)
 
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
@@ -318,53 +331,6 @@ class robot_luft(Robot_single):
         self.rb_ids[self.p_i] = r.id
         return nis
     
-    def robot_meas_luft2(self, r: 'robot_luft', sr=0, sb=0, thres=0, max_dist=-1, amb=True, pout_r=0, pout_b=0):
-        """
-        Implements Lufts et al algorithm for CL localization
-        """
-        # Get ambigious measurement
-        ys = traj.gen_rb2_amb(self.path[0,self.p_i], 
-                           r.path[0,r.p_i], 
-                           self.path[1:3, self.p_i:self.p_i+1], 
-                           r.path[1:3, r.p_i:r.p_i+1],
-                           self.t,
-                           r.t,
-                           sr=sr,
-                           sb=sb,
-                           amb=amb,
-                           pout_r=pout_r,
-                           pout_b=pout_b)
-        if (max_dist > 0 and ys[2,0] > max_dist):
-            print("(2)Robot " + str(r.id) + " out of range for robot " + str(self.id) + " at time " + str(self.p_i*self.dt))
-            return None
-        # Else: robot within range:
-        print("Robot " + str(self.id) + " sees robot " + str(r.id) + " at time " + str(self.p_i*self.dt))
-        # Request quantities from other robot:
-        xj, Pjj, sigmaji, idj, tj = r.send_requested(self.id)
-        # KF update
-        xj_new, Pjj_new, cor_num, nis, _ = mf.KF_relative_luft2(self.mot, 
-                                                                self.meas, 
-                                                                idj, 
-                                                                xj,
-                                                                Pjj,
-                                                                sigmaji, 
-                                                                tj,
-                                                                ys, 
-                                                                self.id_list,
-                                                                self.s_list,
-                                                                self.id_num,
-                                                                thres=thres)
-        self.id_num = cor_num
-        # send updated quantities back to j
-        r.recieve_update(xj_new, Pjj_new, self.id)
-
-        # Log updated quantities:        
-        self.x_log[:,self.p_i:self.p_i+1] = self.x
-        self.P_log[:,:,self.p_i] = self.P
-        self.nis_rb[self.p_i] = nis
-        self.rb_ids[self.p_i] = r.id
-        return nis
-
     def recieve_update(self, xnew, Pnew, idj):
         """
         Update own values after a succesfull measurement
@@ -384,6 +350,56 @@ class robot_luft(Robot_single):
         ti = self.t
         return xi, Pii, sigmaij, idi, ti
 
+
+class robot_luft_multi(Robot_single):
+    def __init__(self, x0: np.ndarray,
+                 path: np.ndarray, 
+                 imu: np.ndarray,
+                 id: int,
+                 dt: float = 1.0,
+                 P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
+                 Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 0.000001, 0.00001, 0.00001]),
+                 R: np.ndarray = np.diag([0.0009, 0.001, 0.0002, 0.004, 0.004]),
+                 t: np.ndarray = np.array([[0],[0]]),
+                 hyp_max: int = 4
+                 ):
+        """"
+        Inits the robot model, used for lufts implementation of collaborative localization
+        Args:
+            path (np.ndarray): trajectory to follow
+            imu (np.ndarray): imu measurements of path
+        """
+        super().__init__(x0=x0, path=path, imu=imu, dt=dt, P=P, Q=Q, R=R, t=t, id=id)
+        # Setup list of robots we have met
+        self.id_len = 10 # Allocate memory for 10 robots
+        self.id_num = 0 # current length of dictionary
+        self.id_list = {}
+        self.s_list = np.zeros((mf.STATE_LEN, mf.STATE_LEN, hyp_max, self.id_len)) # list for interrobot correleations (sigmaij)
+
+        # Overwrite motion models, so they contain all the possible hypotheses
+        self.mot = [mf.MotionModel(x0 = x0, dt=dt, P=P, Q=Q)]*hyp_max
+    
+    def predict(self, imu_correct=True, thres=0):
+        """
+        Predict one timestep
+        """
+        if self.p_i < self.p_len-1:
+            for i in range(self.hyp_max):
+                self.mot[i].predict()
+                self.mot[i].propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
+                if imu_correct:
+                    nis, _= mf.KF_IMU_rom(self.mot[i], self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
+            self.p_i += 1 
+        else:
+            print("End of trajectory!!")
+            return nis
+
+        # Log updated quantities:        
+        self.x_log[:,self.p_i:self.p_i+1] = self.x #<-- change this so the most likely x is returned
+        self.P_log[:,:,self.p_i] = self.P
+        self.nis_IMU[self.p_i - 1] = nis # -1, because it was due to IMU meas at that point
+
+        return nis
 
 
 ########### Error functions ###############
