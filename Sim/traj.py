@@ -244,7 +244,9 @@ def pdoa2ang(a):
     return mang
 
 def gen_adv_amb(a):
-    
+    """
+    More detailed model of ambivalent measurements that includes upp to four ambiguities
+    """
     d = 0.026 # 0.0231      # Distance between antennas
     f = 6.4896e9    # frequency
     c = 299792458   # speed of light
@@ -278,7 +280,7 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=
     q = (posj + mf.RM(thetaj) @ tj - posi - mf.RM(thetai) @ ti)
     
     # Range and bearing:
-    b = np.arctan2(q[1], q[0]) - thetai # true measurement
+    b = mf.normalize_angle(np.arctan2(q[1], q[0]) - thetai) # true measurement
     r = np.sqrt(np.transpose(q) @ q)
 
     # Generate noise
@@ -302,11 +304,8 @@ def gen_rb_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b=
         b += b_noise
 
     if amb:
-        ys = np.zeros((2,2)) # two ambiguities
-        ys[0,0] = mf.normalize_angle(b)
-        ys[0,1] = mf.normalize_angle(np.pi - b) # bad measurement
-        ys[1,0] = r
-        ys[1,1] = r
+        ys = gen_adv_amb(b)
+        ys = np.stack([ys, np.ones_like(ys)*r[0,0]], axis=0)
     else:
         ys = np.zeros((2,1)) # No ambiguities
         ys[0,0] = mf.normalize_angle(b)
@@ -329,17 +328,10 @@ def gen_rb2_amb(thetai, thetaj, posi, posj, ti, tj, sb=0, sr=0, pout_r=0, pout_b
         y_out[mf.Z_R2, 0] = y1[mf.Z_R, 0]
     else: 
         # Ambigious measurement
-        y_out = np.zeros((mf.RB2_LEN, 4))
-        
-        y_out[mf.Z_PHI, 0] = y1[mf.Z_PHI, 0]
-        y_out[mf.Z_PHI2, 0] = y2[mf.Z_PHI, 0]
-        y_out[mf.Z_PHI, 1] = y1[mf.Z_PHI, 1]
-        y_out[mf.Z_PHI2, 1] = y2[mf.Z_PHI, 0]
-        y_out[mf.Z_PHI, 2] = y1[mf.Z_PHI, 0]
-        y_out[mf.Z_PHI2, 2] = y2[mf.Z_PHI, 1]
-        y_out[mf.Z_PHI, 3] = y1[mf.Z_PHI, 1]
-        y_out[mf.Z_PHI2, 3] = y2[mf.Z_PHI, 1]
-
-        y_out[mf.Z_R2, :] = y1[mf.Z_R, 0]
+        X, Y = np.meshgrid(y1[mf.Z_PHI,:], y2[mf.Z_PHI,:], indexing='ij')
+        y_out_upper = np.vstack([X.ravel(), Y.ravel()]) 
+        y_out_lower = np.ones_like(y_out_upper[mf.Z_R,:])*y1[mf.Z_R, 0]
+        # Then stack and return
+        y_out = np.append(y_out_upper, y_out_lower.reshape(1,-1), axis=0)
 
     return y_out

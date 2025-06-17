@@ -35,7 +35,7 @@ anchor2 = sim.Anchor(x0=xanc2, id=2)
 
 
 # %%
-list_seeds = [1061, 1, 19001]
+list_seeds = [1061]
 #1061, 1, 19001, 7871871, 2289, 91667, 8, 6119077, 47, 5514
 seeds_num = len(list_seeds)
 
@@ -44,12 +44,12 @@ sr = R_r
 sb = R_b
 r_w = R_w
 r_a = R_a
-sim_max_dist = 35
+sim_max_dist = 0 # 35
 thres_anc = 14.5 # 99.5 % confidence
 thres_rob = 12 # 99.5 % confidence else 12 for df=2
 thres_IMU = 14.5 # 99.5 % confidence
 meas2_anc = True
-meas2_rob = False
+meas2_rob = True
 out_freq = np.array([[0.0],[0.0],[0.0]]) # an outlier every second on average
 pout_r = 0
 pout_b = 0
@@ -103,6 +103,9 @@ def run_sim_loop(j):
     # Save estimates and covariances:
     return {
         'j': j,
+        'id1' : robotL1.id,
+        'id2' : robotL1.id,
+        'id3' : robotL1.id,
         'x_logL1': robotL1.x_log,
         'P_logL1': robotL1.P_log,
         'x_logL2': robotL2.x_log,
@@ -177,9 +180,9 @@ def main():
         biases3[:,j] = res['biases3']
 
     # finally save to an pickle object:
-    robdat1 = sldat.RobotData(x_logL1, P_logL1, nis_log1, nis_rb_log1, pos1, biases1, rb_ids=rb_ids1, id=111)
-    robdat2 = sldat.RobotData(x_logL2, P_logL2, nis_log2, nis_rb_log2, pos2, biases2, rb_ids=rb_ids2, id=222)
-    robdat3 = sldat.RobotData(x_logL3, P_logL3, nis_log3, nis_rb_log3, pos3, biases3, rb_ids=rb_ids3, id=333)
+    robdat1 = sldat.RobotData(x_logL1, P_logL1, nis_log1, nis_rb_log1, pos1, biases1, rb_ids=rb_ids1, id=res['id1'])
+    robdat2 = sldat.RobotData(x_logL2, P_logL2, nis_log2, nis_rb_log2, pos2, biases2, rb_ids=rb_ids2, id=res['id2'])
+    robdat3 = sldat.RobotData(x_logL3, P_logL3, nis_log3, nis_rb_log3, pos3, biases3, rb_ids=rb_ids3, id=res['id3'])
     robcol = sldat.RobotCollection([robdat1, robdat2, robdat3], [xanc1, xanc2])
     sldat.save_data(robcol, 'para')
 

@@ -997,10 +997,10 @@ def _KF_relative_decen2(moti: MotionModel,
     rad_sel = np.array([[True],[True],[False]]) #TODO: not the best that this is hardcoded
     R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: #neither is this
 
-    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, 10*R, ys, ypred, rad_sel, thres=thres) # TODO: multiplying R with 10, to prioritize this measurements lower than anchors
+    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, 10*R, ys, ypred, rad_sel) # TODO: multiplying R with 10, to prioritize this measurements lower than anchors
     # Now, split up the results:
     if thres > 0 and nis > thres:
-        print("NIS too large. Skipping DECEN update")
+        print("NIS too large. Skipping DECEN2 update")
         return xj, Pii, Pii, Pjj, cor_num, nis, K
     moti.x = xnew[:STATE_LEN, 0:1]
     xj_new = xnew[STATE_LEN:, 0:1]
@@ -1227,10 +1227,10 @@ def ML_rb_gen(ys,
             ml = p
             i_final = i
     # Debug: Notify us when wrong measurement is used:
-    if not i_final == 0:
-        print("Wrong measurement used!! Bearing: " + str(ys[0,i_final]) + " was used instead of: " + str(ys[0,0]))
-    if ml == 0.0:
-        print("Zero! how?")
+    #if not i_final == 0:
+    #    print("Wrong measurement used!! Bearing: " + str(ys[0,i_final]) + " was used instead of: " + str(ys[0,0]))
+    #if ml == 0.0:
+    #    print("Zero! how?")
     # Use the most likely bearing for final measurement
     z = ys[:,i_final:i_final+1]
 
@@ -1258,8 +1258,8 @@ def MD_rb_gen(ys,
             md_min = md
             i_final = i
     # Debug: Notify us when wrong measurement is used:
-    if not i_final == 0:
-        print("Wrong measurement used!! Bearing: " + str(ys[0,i_final]) + " was used instead of: " + str(ys[0,0]))
+    #if not i_final == 0:
+    #    print("Wrong measurement used!! Bearing: " + str(ys[0,i_final]) + " was used instead of: " + str(ys[0,0]))
     # Use the most likely bearing for final measurement
     z = ys[:,i_final:i_final+1]
 
