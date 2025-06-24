@@ -7,3 +7,4 @@ API/log.csv
 API/log.csv
 Sim/dataSim/test.pickle
 *.pickle
+*.gz

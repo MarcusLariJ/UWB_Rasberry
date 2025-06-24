@@ -5,7 +5,7 @@ import gzip
 
 class RobotData():
     """
-        Save data from a single robot from N runs of length L
+        Save data for N robots from k runs of length L
     """
     def __init__(self, x_log: np.ndarray, 
                  P_log: np.ndarray, 
@@ -13,7 +13,7 @@ class RobotData():
                  RB_nis_log: np.ndarray, 
                  pos: np.ndarray,
                  biases: np.ndarray, 
-                 id: int, 
+                 ids: np.ndarray, 
                  rb_ids: np.ndarray):
         self.x_log = x_log # state logged by robot
         self.P_log = P_log # covariance logged by robot
@@ -21,20 +21,10 @@ class RobotData():
         self.RB_nis_log = RB_nis_log # RB NIS logged by robot
         self.pos = pos # the reference position
         self.biases = biases # the constant bias applied during this run
-        self.id = id
+        self.ids = ids
         self.rb_ids = rb_ids
 
-class RobotCollection():
-    """
-        collection of robot datas, for easier organization
-    """
-    def __init__(self, robotlist: list, anchorlist: list):
-        # Robot data
-        self.robotlist = robotlist
-        # Anchor data (mainly just their position) 
-        self.anchorlist = anchorlist 
-
-def save_data(obj: RobotCollection, filename):
+def save_data(obj: RobotData, filename):
     folder = "dataSim"
     os.makedirs(folder, exist_ok=True)  # Create the folder if it doesn't exist
     filepath = os.path.join(folder, filename + ".pkl.gz")
@@ -45,7 +35,7 @@ def save_data(obj: RobotCollection, filename):
     except Exception as ex:
         print("Error during pickling object (Possibly unsupported):", ex)
 
-def load_object(filename):
+def load_object(filename) -> RobotData:
     folder = "dataSim"
     filepath = os.path.join(folder, filename + ".pkl.gz")
 
