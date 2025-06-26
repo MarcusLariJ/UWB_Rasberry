@@ -359,8 +359,6 @@ int application_twr_pdoa_tag(void)
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Poll frame\n");
-				//dwt_readtxtimestamp(timestamp_buffer);
-				tx_timestamp_poll = get_tx_timestamp_u64();
 				last_sync_time = millis();
 			}
 
@@ -418,9 +416,7 @@ int application_twr_pdoa_tag(void)
 					continue;
 				}
 
-				printf("RX: Response frame\n");
-				//dwt_readrxtimestamp(timestamp_buffer);
-				rx_timestamp_response = get_rx_timestamp_u64();
+				printf("RX: Response frame\n");			
 
 				/* get the PDoA of the response frame (AoD)*/
 				pdoa_tx = dwt_readpdoa(); 
@@ -439,6 +435,9 @@ int application_twr_pdoa_tag(void)
 				memcpy(final_frame.src_address, my_ID, 2);
 				memcpy(final_frame.dst_address, your_ID, 2);
 				final_frame.sequence_number = next_sequence_number++;
+
+				rx_timestamp_response = get_rx_timestamp_u64();
+				tx_timestamp_poll = get_tx_timestamp_u64();
 
 				tx_timestamp_final = rx_timestamp_response + round_tx_delay + TX_ANT_DLY; // inclue antenna delay in final timestamp
 
@@ -611,7 +610,6 @@ int application_twr_pdoa_tag(void)
 
 				printf("RX: Poll frame\n");
 
-				//dwt_readrxtimestamp(timestamp_buffer);
 				rx_timestamp_poll = get_rx_timestamp_u64();
 
 				/* Accept frame and continue ranging */
@@ -648,8 +646,6 @@ int application_twr_pdoa_tag(void)
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Response frame\n");
-				//dwt_readtxtimestamp(timestamp_buffer);
-				tx_timestamp_response = get_tx_timestamp_u64();;
 				last_sync_time = millis();
 			}
 			
@@ -708,9 +704,7 @@ int application_twr_pdoa_tag(void)
 				}
 
 				printf("RX: Final frame\n");
-
-				//dwt_readrxtimestamp(timestamp_buffer);
-				rx_timestamp_final = get_rx_timestamp_u64();
+			
 
 				/* Marker for serial output parsing script*/
 				snprintf(print_buffer, sizeof(print_buffer), "New Frame: poll: %u\n", next_sequence_number);
@@ -728,6 +722,9 @@ int application_twr_pdoa_tag(void)
 
 			if ((tx_done == 2) && (rx_done == 2)) {
 				rx_final_frame_pointer = (twr_final_frame_t *)rx_buffer;
+
+				tx_timestamp_response = get_tx_timestamp_u64();
+				rx_timestamp_final = get_rx_timestamp_u64();
 
 				// convert to 32 bit
 				uint32_t rx_timestamp_poll_32 = (uint32_t)rx_timestamp_poll;
