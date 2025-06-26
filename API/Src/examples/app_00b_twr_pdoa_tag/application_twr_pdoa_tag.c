@@ -205,7 +205,7 @@ int application_twr_pdoa_tag(void)
 	/* Activate reception immediately (as we start out as an anchor). */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-    uint8_t timestamp_buffer[5];
+    //uint8_t timestamp_buffer[5];
     uint8_t rx_buffer[max_frame_length];
     twr_base_frame_t *rx_frame_pointer;
     twr_final_frame_t *rx_final_frame_pointer;
@@ -359,8 +359,8 @@ int application_twr_pdoa_tag(void)
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Poll frame\n");
-				dwt_readtxtimestamp(timestamp_buffer);
-				tx_timestamp_poll = decode_40bit_timestamp(timestamp_buffer);
+				//dwt_readtxtimestamp(timestamp_buffer);
+				tx_timestamp_poll = get_tx_timestamp_u64();
 				last_sync_time = millis();
 			}
 
@@ -419,8 +419,8 @@ int application_twr_pdoa_tag(void)
 				}
 
 				printf("RX: Response frame\n");
-				dwt_readrxtimestamp(timestamp_buffer);
-				rx_timestamp_response = decode_40bit_timestamp(timestamp_buffer);
+				//dwt_readrxtimestamp(timestamp_buffer);
+				rx_timestamp_response = get_rx_timestamp_u64();
 
 				/* get the PDoA of the response frame (AoD)*/
 				pdoa_tx = dwt_readpdoa(); 
@@ -605,8 +605,8 @@ int application_twr_pdoa_tag(void)
 
 				printf("RX: Poll frame\n");
 
-				dwt_readrxtimestamp(timestamp_buffer);
-				rx_timestamp_poll = decode_40bit_timestamp(timestamp_buffer);
+				//dwt_readrxtimestamp(timestamp_buffer);
+				rx_timestamp_poll = get_rx_timestamp_u64();
 
 				/* Accept frame and continue ranging */
 				next_sequence_number++;
@@ -642,8 +642,8 @@ int application_twr_pdoa_tag(void)
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Response frame\n");
-				dwt_readtxtimestamp(timestamp_buffer);
-				tx_timestamp_response = decode_40bit_timestamp(timestamp_buffer);
+				//dwt_readtxtimestamp(timestamp_buffer);
+				tx_timestamp_response = get_tx_timestamp_u64();;
 				last_sync_time = millis();
 			}
 			
@@ -703,8 +703,8 @@ int application_twr_pdoa_tag(void)
 
 				printf("RX: Final frame\n");
 
-				dwt_readrxtimestamp(timestamp_buffer);
-				rx_timestamp_final = decode_40bit_timestamp(timestamp_buffer);
+				//dwt_readrxtimestamp(timestamp_buffer);
+				rx_timestamp_final = get_rx_timestamp_u64();
 
 				/* Marker for serial output parsing script*/
 				snprintf(print_buffer, sizeof(print_buffer), "New Frame: poll: %u\n", next_sequence_number);
