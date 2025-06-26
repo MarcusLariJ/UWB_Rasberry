@@ -723,8 +723,13 @@ int application_twr_pdoa_tag(void)
 			if ((tx_done == 2) && (rx_done == 2)) {
 				rx_final_frame_pointer = (twr_final_frame_t *)rx_buffer;
 
-				double Treply1 = (double)(tx_timestamp_response - rx_timestamp_poll);
-				double Tround2 = (double)(rx_timestamp_final - tx_timestamp_response);
+				// convert to 32 bit
+				uint32_t rx_timestamp_poll_32 = (uint32_t)rx_timestamp_poll;
+				uint32_t tx_timestamp_response_32 = (uint32_t)tx_timestamp_response;
+				uint32_t rx_timestamp_final_32 = (uint32_t)rx_timestamp_final;
+
+				double Treply1 = (double)(tx_timestamp_response_32 - rx_timestamp_poll_32);
+				double Tround2 = (double)(rx_timestamp_final_32 - tx_timestamp_response_32);
 
 				double Tround1 = (double)(decode_40bit_timestamp(rx_final_frame_pointer->poll_resp_round_time));
 				double Treply2 = (double)(decode_40bit_timestamp(rx_final_frame_pointer->resp_final_reply_time));
