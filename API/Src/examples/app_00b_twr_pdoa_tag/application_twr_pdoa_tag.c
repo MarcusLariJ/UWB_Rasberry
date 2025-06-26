@@ -723,18 +723,18 @@ int application_twr_pdoa_tag(void)
 			if ((tx_done == 2) && (rx_done == 2)) {
 				rx_final_frame_pointer = (twr_final_frame_t *)rx_buffer;
 
-				const uint64_t Treply1 = tx_timestamp_response - rx_timestamp_poll;
-				const uint64_t Tround2 = rx_timestamp_final - tx_timestamp_response;
+				uint64_t Treply1 = tx_timestamp_response - rx_timestamp_poll;
+				uint64_t Tround2 = rx_timestamp_final - tx_timestamp_response;
 
-				const uint64_t Tround1 = decode_40bit_timestamp(rx_final_frame_pointer->poll_resp_round_time);
-				const uint64_t Treply2 = decode_40bit_timestamp(rx_final_frame_pointer->resp_final_reply_time);
+				uint64_t Tround1 = decode_40bit_timestamp(rx_final_frame_pointer->poll_resp_round_time);
+				uint64_t Treply2 = decode_40bit_timestamp(rx_final_frame_pointer->resp_final_reply_time);
 
-				const uint64_t subtraction = (Tround1*Tround2 - Treply1*Treply2);
-				const uint64_t denominator = (Tround1 + Tround2 + Treply1 + Treply2);
+				uint64_t subtraction = (Tround1*Tround2 - Treply1*Treply2);
+				uint64_t denominator = (Tround1 + Tround2 + Treply1 + Treply2);
 
 				// timestamp resolution is approximately u=15.65ps => 1ns = 63.898*u
 				// to get ns the division by 63.898 is approximated by an division by 64 using a bit shift
-				const float tprop_ns = ((double)subtraction) / (denominator << 6);
+				double tprop_ns = ((double)subtraction) / ((double)denominator*63.898);
 				const uint32_t dist_mm = (uint32_t)(tprop_ns*299.792458);  // usint c = 299.7... mm/ns
 
 				pdoa_tx = rx_final_frame_pointer->pdoa_tx;
