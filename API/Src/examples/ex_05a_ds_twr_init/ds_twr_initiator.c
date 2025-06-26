@@ -52,7 +52,7 @@ static dwt_config_t config = {
 };
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 1000
+#define RNG_DELAY_MS 20 //1000
 
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
