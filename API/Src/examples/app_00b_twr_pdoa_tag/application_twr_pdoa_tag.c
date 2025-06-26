@@ -729,13 +729,13 @@ int application_twr_pdoa_tag(void)
 				uint64_t Tround1 = decode_40bit_timestamp(rx_final_frame_pointer->poll_resp_round_time);
 				uint64_t Treply2 = decode_40bit_timestamp(rx_final_frame_pointer->resp_final_reply_time);
 
-				uint64_t subtraction = (Tround1*Tround2 - Treply1*Treply2);
-				uint64_t denominator = (Tround1 + Tround2 + Treply1 + Treply2);
+				double subtraction = ((double)Tround1*(double)Tround2 - (double)Treply1*(double)Treply2);
+				double denominator = (double)(Tround1 + Tround2 + Treply1 + Treply2);
 
 				// timestamp resolution is approximately u=15.65ps => 1ns = 63.898*u
 				// to get ns the division by 63.898 is approximated by an division by 64 using a bit shift
-				double tprop_ns = ((double)subtraction) / ((double)denominator*63.898);
-				const uint32_t dist_mm = (uint32_t)(tprop_ns*299.792458);  // usint c = 299.7... mm/ns
+				double tprop_ns = (subtraction) / (denominator*63.898);
+				const uint64_t dist_mm = (uint64_t)(tprop_ns*299.792458);  // usint c = 299.7... mm/ns
 
 				pdoa_tx = rx_final_frame_pointer->pdoa_tx;
 
