@@ -200,7 +200,7 @@ int ds_twr_responder(void)
                 dwt_setdelayedtrxtime(resp_tx_time);
 
                 /* Set expected delay and timeout for final message reception. See NOTE 4 and 5 below. */
-                dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
+                //dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
                 dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
                 /* Set preamble timeout for expected frames. See NOTE 6 below. */
                 dwt_setpreambledetecttimeout(PRE_TIMEOUT);
