@@ -87,9 +87,9 @@ static uint32_t status_reg = 0;
 /* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW IC's wait for response feature. */
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 100 // from 500
 /* Receive final timeout. See NOTE 5 below. */
-#define FINAL_RX_TIMEOUT_UUS 420
+#define FINAL_RX_TIMEOUT_UUS 0 //420
 /* Preamble timeout, in multiple of PAC size. See NOTE 6 below. */
-#define PRE_TIMEOUT 8
+#define PRE_TIMEOUT 0 //8
 
 /* Timestamps of frames transmission/reception. */
 static uint64_t poll_rx_ts;
