@@ -442,20 +442,24 @@ int application_twr_pdoa_tag(void)
 
 				tx_timestamp_final = rx_timestamp_response + round_tx_delay + TX_ANT_DLY; // inclue antenna delay in final timestamp
 
-				uint64_t Tround1 = rx_timestamp_response - tx_timestamp_poll;
-				uint64_t Treply2 = tx_timestamp_final - rx_timestamp_response;
+				uint32_t tx_timestamp_poll_32 = (uint32_t)tx_timestamp_poll;
+				uint32_t rx_timestamp_response_32 = (uint32_t)rx_timestamp_response;
+				uint32_t tx_timestamp_final_32 = (uint32_t)tx_timestamp_final;
+
+				uint32_t Tround1 = rx_timestamp_response_32 - tx_timestamp_poll_32;
+				uint32_t Treply2 = tx_timestamp_final_32 - rx_timestamp_response_32;
 
 				final_frame.poll_resp_round_time[0] = (uint8_t)Tround1;
 				final_frame.poll_resp_round_time[1] = (uint8_t)(Tround1 >> 8);
 				final_frame.poll_resp_round_time[2] = (uint8_t)(Tround1 >> 16);
 				final_frame.poll_resp_round_time[3] = (uint8_t)(Tround1 >> 24);
-				final_frame.poll_resp_round_time[4] = (uint8_t)(Tround1 >> 32);
+				//final_frame.poll_resp_round_time[4] = (uint8_t)(Tround1 >> 32);
 
 				final_frame.resp_final_reply_time[0] = (uint8_t)Treply2;
 				final_frame.resp_final_reply_time[1] = (uint8_t)(Treply2 >> 8);
 				final_frame.resp_final_reply_time[2] = (uint8_t)(Treply2 >> 16);
 				final_frame.resp_final_reply_time[3] = (uint8_t)(Treply2 >> 24);
-				final_frame.resp_final_reply_time[4] = (uint8_t)(Treply2 >> 32);
+				//final_frame.resp_final_reply_time[4] = (uint8_t)(Treply2 >> 32);
 
 				final_frame.pdoa_tx = pdoa_tx;
 
@@ -725,8 +729,13 @@ int application_twr_pdoa_tag(void)
 			if ((tx_done == 2) && (rx_done == 2)) {
 				rx_final_frame_pointer = (twr_final_frame_t *)rx_buffer;
 
-				double Treply1 = (double)(tx_timestamp_response - rx_timestamp_poll);
-				double Tround2 = (double)(rx_timestamp_final - tx_timestamp_response);
+				// convert to 32 bit
+				uint32_t rx_timestamp_poll_32 = (uint32_t)rx_timestamp_poll;
+				uint32_t tx_timestamp_response_32 = (uint32_t)tx_timestamp_response;
+				uint32_t rx_timestamp_final_32 = (uint32_t)rx_timestamp_final;
+
+				double Treply1 = (double)(tx_timestamp_response_32 - rx_timestamp_poll_32);
+				double Tround2 = (double)(rx_timestamp_final_32 - tx_timestamp_response_32);
 
 				double Tround1 = (double)(decode_40bit_timestamp(rx_final_frame_pointer->poll_resp_round_time));
 				double Treply2 = (double)(decode_40bit_timestamp(rx_final_frame_pointer->resp_final_reply_time));
