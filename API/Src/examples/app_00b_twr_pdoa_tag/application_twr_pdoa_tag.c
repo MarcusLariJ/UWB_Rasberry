@@ -761,6 +761,8 @@ int application_twr_pdoa_tag(void)
 
 				printf("Tround1: %u\n", Tround1_temp);
 				printf("Treply2: %u\n", Treply2_temp);
+				printf("Tround2: %u\n", Tround2);
+				printf("Treply1: %u\n", Treply1);
 
 				double Tround1 = (double)Tround1_temp;
 				double Treply2 = (double)Treply2_temp;
