@@ -467,9 +467,6 @@ int application_twr_pdoa_tag(void)
 				uint32_t Tround1 = rx_timestamp_response_32 - tx_timestamp_poll_32;
 				uint32_t Treply2 = tx_timestamp_final_32 - rx_timestamp_response_32;
 
-				printf("Tround1: %u\n", Tround1);
-				printf("Treply2: %u\n", Treply2);
-
 				final_frame.poll_resp_round_time[0] = (uint8_t)Tround1;
 				final_frame.poll_resp_round_time[1] = (uint8_t)(Tround1 >> 8);
 				final_frame.poll_resp_round_time[2] = (uint8_t)(Tround1 >> 16);
@@ -753,16 +750,19 @@ int application_twr_pdoa_tag(void)
 				uint32_t tx_timestamp_response_32 = (uint32_t)tx_timestamp_response;
 				uint32_t rx_timestamp_final_32 = (uint32_t)rx_timestamp_final;
 
-				double Treply1 = (double)(tx_timestamp_response_32 - rx_timestamp_poll_32);
-				double Tround2 = (double)(rx_timestamp_final_32 - tx_timestamp_response_32);
+				uint32_t Treply1_temp = (tx_timestamp_response_32 - rx_timestamp_poll_32);
+				uint32_t Tround2_temp = (rx_timestamp_final_32 - tx_timestamp_response_32);
 
 				uint32_t Tround1_temp = (uint32_t)(decode_40bit_timestamp(rx_final_frame_pointer->poll_resp_round_time));
 				uint32_t Treply2_temp = (uint32_t)(decode_40bit_timestamp(rx_final_frame_pointer->resp_final_reply_time));
 
 				printf("Tround1: %u\n", Tround1_temp);
 				printf("Treply2: %u\n", Treply2_temp);
-				printf("Tround2: %u\n", Tround2);
-				printf("Treply1: %u\n", Treply1);
+				printf("Tround2: %u\n", Tround2_temp);
+				printf("Treply1: %u\n", Treply1_temp);
+
+				double Treply1 = (double)Treply1_temp;
+				double Tround2 = (double)Tround2_temp;
 
 				double Tround1 = (double)Tround1_temp;
 				double Treply2 = (double)Treply2_temp;
