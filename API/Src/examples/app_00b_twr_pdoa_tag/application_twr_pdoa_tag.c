@@ -757,7 +757,7 @@ int application_twr_pdoa_tag(void)
 				uint32_t Treply2_temp = (uint32_t)(decode_40bit_timestamp(rx_final_frame_pointer->resp_final_reply_time));
 
 				printf("Tround1: %u\n", Tround1_temp);
-				printf("Treply2: %u\n", Treply2_temp);
+				printf("Treply2: %u\n", Treply2_temp); // <- constant
 				printf("Tround2: %u\n", Tround2_temp);
 				printf("Treply1: %u\n", Treply1_temp);
 

@@ -52,7 +52,7 @@ static dwt_config_t config = {
 };
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 20 //1000
+#define RNG_DELAY_MS 100 //1000
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 1 below. */
 #define TX_ANT_DLY 16385
@@ -263,7 +263,7 @@ int ds_twr_responder(void)
                         final_rx_ts_32 = (uint32_t)final_rx_ts;
                         Ra_temp = (resp_rx_ts - poll_tx_ts);
                         Rb_temp = (final_rx_ts_32 - resp_tx_ts_32);
-                        Da_temp = (final_tx_ts - resp_rx_ts);
+                        Da_temp = (final_tx_ts - resp_rx_ts); // <-- constant
                         Db_temp = (resp_tx_ts_32 - poll_rx_ts_32);
 
                         printf("Da: %u\n", Da_temp);
