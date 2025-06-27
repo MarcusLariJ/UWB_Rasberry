@@ -245,7 +245,7 @@ int ds_twr_responder(void)
                         uint32_t poll_tx_ts, resp_rx_ts, final_tx_ts;
                         uint32_t poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
                         double Ra, Rb, Da, Db;
-                        int64_t tof_dtu;
+                        double tof_dtu; //(int64_t)
 
                         /* Retrieve response transmission and final reception timestamps. */
                         resp_tx_ts = get_tx_timestamp_u64();
@@ -264,7 +264,7 @@ int ds_twr_responder(void)
                         Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
                         Da = (double)(final_tx_ts - resp_rx_ts);
                         Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
-                        tof_dtu = (int64_t)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
+                        tof_dtu = ((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
 
                         tof = tof_dtu * DWT_TIME_UNITS;
                         distance = tof * SPEED_OF_LIGHT;
