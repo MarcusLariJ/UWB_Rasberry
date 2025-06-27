@@ -245,6 +245,7 @@ int ds_twr_responder(void)
                         uint32_t poll_tx_ts, resp_rx_ts, final_tx_ts;
                         uint32_t poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
                         double Ra, Rb, Da, Db;
+                        uint32_t Ra_temp, Rb_temp, Da_temp, Db_temp;
                         double tof_dtu; //(int64_t)
 
                         /* Retrieve response transmission and final reception timestamps. */
@@ -260,10 +261,21 @@ int ds_twr_responder(void)
                         poll_rx_ts_32 = (uint32_t)poll_rx_ts;
                         resp_tx_ts_32 = (uint32_t)resp_tx_ts;
                         final_rx_ts_32 = (uint32_t)final_rx_ts;
-                        Ra = (double)(resp_rx_ts - poll_tx_ts);
-                        Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
-                        Da = (double)(final_tx_ts - resp_rx_ts);
-                        Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
+                        Ra_temp = (resp_rx_ts - poll_tx_ts);
+                        Rb_temp = (final_rx_ts_32 - resp_tx_ts_32);
+                        Da_temp = (final_tx_ts - resp_rx_ts);
+                        Db_temp = (resp_tx_ts_32 - poll_rx_ts_32);
+
+                        printf("Da: %u\n", Da_temp);
+				        printf("Ra: %u\n", Ra_temp);
+				        printf("Db: %u\n", Db_temp);
+				        printf("Rb: %u\n", Rb_temp);
+
+                        Ra = (double)Ra_temp;
+                        Rb = (double)Rb_temp;
+                        Da = (double)Da_temp;
+                        Db = (double)Db_temp;
+
                         tof_dtu = ((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
 
                         tof = tof_dtu * DWT_TIME_UNITS;
