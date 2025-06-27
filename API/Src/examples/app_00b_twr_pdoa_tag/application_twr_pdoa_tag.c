@@ -399,13 +399,13 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_ANC;
 					continue;
 				}
-
+				/*
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
-				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
+				if (sts_quality < 0) { // >= 0 good STS, < 0 bad STS 
 					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR_ANC;
 					continue;
-				}
+				} */
 
 				dwt_readrxdata(rx_buffer, new_frame_length, 0);
 				/* We assume this is a TWR frame, but not necessarily the right one */
@@ -591,13 +591,13 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_TAG;
 					continue;
 				}
-
+				/*
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
-				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
+				if (sts_quality < 0) { // >= 0 good STS, < 0 bad STS 
 					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR_TAG;
 					continue;
-				}
+				} */
 
 				dwt_readrxdata(rx_buffer, new_frame_length, 0);
 				/* We assume this is a TWR frame, but not necessarily the right one */
@@ -686,13 +686,13 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_TAG;
 					continue;
 				}
-
+				/*
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
-				if (sts_quality < 0) { /* >= 0 good STS, < 0 bad STS */
+				if (sts_quality < 0) { // >= 0 good STS, < 0 bad STS 
 					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR_TAG;
 					continue;
-				}
+				}*/
 
 				dwt_readrxdata(rx_buffer, new_frame_length, 0);
 				/* For simplicity we assume this is a TWR frame, but not necessarily the right one */
