@@ -209,8 +209,8 @@ int ds_twr_initiator(void)
                 dwt_setdelayedtrxtime(final_tx_time);
 
                 /* Final TX timestamp is the transmission time we programmed plus the TX antenna delay. */
-                //final_tx_ts = (((uint64_t)(final_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
-                final_tx_ts = resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME) + TX_ANT_DLY; // intentionally shittifying the code
+                final_tx_ts = (((uint64_t)(final_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
+                //final_tx_ts = resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME) + TX_ANT_DLY; // intentionally shittifying the code
 
                 /* Write all timestamps in the final message. See NOTE 12 below. */
                 final_msg_set_ts(&tx_final_msg[FINAL_MSG_POLL_TX_TS_IDX], poll_tx_ts);
