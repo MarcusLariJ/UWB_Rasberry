@@ -456,6 +456,8 @@ int application_twr_pdoa_tag(void)
 				tx_done = 0;
 				printf("TX: Final frame\n");
 				state = TWR_SYNC_STATE_ANC;
+				// update timeout after afinished exchange - incase the anchor is stuck with a bad high timeout
+				tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
 			}
 			break;
 		case TWR_ERROR_ANC:
