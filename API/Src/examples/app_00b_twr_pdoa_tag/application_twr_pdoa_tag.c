@@ -27,7 +27,7 @@
 #if defined(APP_TWR_PDOA)
 
 #define DEVICE_MAX_NUM 10 // number of expected devices to communicate with
-#define FORCE_ANCHOR 1 // Force the device to be an anchor and never enter tag mode
+#define FORCE_ANCHOR 0 // Force the device to be an anchor and never enter tag mode
 #define FORCE_TAG 0 // Force the device to be a tag
 
 // antenna delays for calibration
@@ -110,15 +110,14 @@ uint8_t tdoa_rx[5];
 uint8_t next_sequence_number = 0;
 float dist_sum = 0;
 
-// unique chip ID of the decawace chip. Used for identification
-const uint16_t CHIPID_ADDR = 0x06;
-uint32_t device_id;
 
 enum state_t {
 	TWR_SYNC_STATE_TAG,
+	TWR_WAIT_FOR_CLEAR_STATE_ANC,
 	TWR_POLL_RESPONSE_STATE_TAG,
 	TWR_FINAL_STATE_TAG,
 	TWR_SYNC_STATE_ANC,
+	TWR_SYNC_TX_STATE_TAG,
 	TWR_POLL_RESPONSE_STATE_ANC,
 	TWR_FINAL_STATE_ANC,
 	TWR_ERROR_TAG,
@@ -130,11 +129,12 @@ uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
 static const uint64_t round_tx_delay = 1000llu*US_TO_DWT_TIME;  // reply time (1ms)
-static const unsigned int tag_sync_timeout = 10; // (10 ms) 100 ms
+static const unsigned int tag_sync_timeout = 10; // 10 ms
 static const unsigned int anc_resp_timeout = 10; // slightly smaller than sync timeout
 static const unsigned int min_tx_timeout = 5; // min timout value
-static const unsigned int avg_tx_timeout = 20; // (5 ms) 100 ms, Should be at least four times that of round_tx_delay 
-unsigned int tx_timeout = min_tx_timeout + avg_tx_timeout/2; // the timeout, before reverting to anchor
+static const unsigned int max_tx_timeout = 20; // 20 ms. Adjust according to how many tags are active at once
+static const unsigned int responses_timeout = max_tx_timeout; // when the tag should stop waiting for responses. Larger than normal timeout, to catch late anchors.
+unsigned int tx_timeout = min_tx_timeout + max_tx_timeout/2; // the timeout, before reverting to anchor
 
 void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
 void print_hex(const uint8_t *bytes, size_t length);
@@ -216,27 +216,13 @@ int application_twr_pdoa_tag(void)
     float current_rotation = 0;
     uint16_t twr_count = 0;
 
-    /*Get unique chip ID from OTP memory as device identification*/
-	dwt_otpread(CHIPID_ADDR, &device_id, 1);
-	uint8_t my_ID[2]; // id of tag 
-	my_ID[0] = device_id >> 24 & 0xFF;
-	my_ID[1] = device_id >> 16 & 0xFF;
+	/*Assign random ID to each device*/
+	srand(millis());
+	uint8_t my_ID[2]; // ID of tag
+	uint8_t your_ID[2]; // ID of destination
+	my_ID[0] = rand() % 256;
+	my_ID[1] = rand() % 256;
 	print_hex(my_ID, 2);
-	/*This hacky code is a way to make sure that the devices own ID dosent appear with the other IDs*/
-	uint8_t known_IDs[] = {0x96, 0xC2, 0x16, 0xC2};
-	uint8_t device_num = 1; // current number of known devices
-	uint8_t device_crt = 0; // the current index of device
-	uint8_t your_ID[2]; // expected address of incoming message
-	uint8_t your_ID_list[device_num*2];
-	int temp_idx = 0;
-	for (int i=0; i < (device_num+1); i++){
-		if (memcmp(my_ID, &known_IDs[i*2], 2) != 0)
-		{
-			print_hex(&known_IDs[2*i], 2);
-			your_ID_list[temp_idx++] = known_IDs[2*i];
-			your_ID_list[temp_idx++] = known_IDs[2*i+1];
-		}
-	}
 
 	if (FORCE_ANCHOR) {
 		printf("Device set as anchor.\n");
@@ -262,8 +248,7 @@ int application_twr_pdoa_tag(void)
 					/* If it is time to transmit: */
 					dwt_forcetrxoff();
 					/* Calculate random timeout time, centered around the average*/
-					tx_timeout = min_tx_timeout + (rand() % (avg_tx_timeout+1));
-					//last_sync_time = millis();
+					tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
 					printf("Changing into tag\n");
 					tag_mode = 1;
 					state = TWR_SYNC_STATE_TAG; // We become a tag
@@ -272,7 +257,7 @@ int application_twr_pdoa_tag(void)
 					tx_timestamp_final = 0;
 					tx_done = 0;
 					rx_done = 0;
-					// continue?
+					continue;
 				}
 			}
 			/* Wait for sync frame (1/4) */
@@ -302,51 +287,33 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_ANC;
 					continue;
 				}
-				/* code for adding new devices dynamically. Commented out since we assume known addresses
-				// Now we know it is a sync frame, we can check if we know the src address:
-				uint8_t device_known = 0;
-				for (int i=0; i < device_num; i++){
-					if (memcmp(&your_ID_list[i*2], rx_frame_pointer->src_address, 2) == 0){
-						// we know the device. Ignore it
-						device_known = 1;
-						break;
-					}
-				}
-				if (!device_known){
-					printf("UNKNOWN SRC ADDRESS. Adding following to list:\n");
-					if (device_num < DEVICE_MAX_NUM){
-						memcpy(&your_ID_list[device_num*2], rx_frame_pointer->src_address, 2);
-						print_hex(&your_ID_list[device_num*2], 2);
-						device_num++; 
-					} else {
-						printf("Device list full. Ignoring");
-					}	
-				}
-				*/				
-				
-				if (memcmp(my_ID, rx_frame_pointer->dst_address, 2) != 0) {
-					printf("RX ERR: wrong dest address on sync frame\n");
-	
-					state = TWR_ERROR_ANC;
-					continue;
-				}
 
 				printf("RX: Sync frame\n");
 
+				state = TWR_WAIT_FOR_CLEAR_STATE_ANC;
+				
 				/* Set the expected source to that of the incoming messages source, to ignore all other messages*/
 				memcpy(your_ID, rx_frame_pointer->src_address, 2);
-
 				/* Initialize the sequence number for this ranging exchange */
 				next_sequence_number = rx_frame_pointer->sequence_number + 1;
-
-				/* Send poll frame (2/4) */
-				state = TWR_POLL_RESPONSE_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
 				// set dest and src:
 				memcpy(poll_frame.src_address, my_ID, 2);
 				memcpy(poll_frame.dst_address, your_ID, 2);
 				poll_frame.sequence_number = next_sequence_number++;
 				dwt_writetxdata(sizeof(poll_frame), (uint8_t *)&poll_frame, 0);
 				dwt_writetxfctrl(sizeof(poll_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
+				
+			}
+			break;
+		case TWR_WAIT_FOR_CLEAR_STATE_ANC:
+			
+			// wait for clear airwaves before attempting to respond:
+			if ((millis() - last_recieve_time) > tx_timeout){
+				// Clear! now transmit:
+				/* Send poll frame (2/4) */
+				printf("Airwaves are clear.Preparing to send poll...\n");
+				state = TWR_POLL_RESPONSE_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
+
 				int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
 					printf("TX ERR: could not send poll frame\n");
@@ -497,22 +464,43 @@ int application_twr_pdoa_tag(void)
 
 		case TWR_SYNC_STATE_TAG:
 			/* Send sync frame (1/4) */
-			// First check if we have looped through all destination addresses
-			if (device_crt >= device_num) {
-				if (device_crt == 0){
-					// Special case: there's currently no known devices. So just broadcast some crap, and get to know someone!
-					printf("Sending random msg: Notice me!\n");
-					memcpy(your_ID, your_ID_list, 2);
-					device_crt++;
-				} else {
+			sync_frame.sequence_number = next_sequence_number++; // maybe sync does not need to keep track of sequence? it breaks exchanges afterwards.
+			// Set the source. Destination does not matter (Sync initiates ranging with all anchors)
+			memcpy(sync_frame.src_address, my_ID, 2);
+			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
+			dwt_writetxfctrl(sizeof(sync_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
+
+			state = TWR_SYNC_TX_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
+			int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+			if (r != DWT_SUCCESS) {
+				state = TWR_ERROR_TAG;
+				printf("TX ERR: could not send sync frame\n");
+				// maybe try again if not forced as tag?
+				continue;
+			}
+			break;
+		case TWR_SYNC_TX_STATE_TAG:
+			if (tx_done == 1) {
+				state = TWR_POLL_RESPONSE_STATE_TAG;
+				printf("TX: Sync frame\n");
+				last_sync_time = millis();
+			}
+			break;
+		case TWR_POLL_RESPONSE_STATE_TAG:
+			/* 	In this state, the tag awaits all the delayed responses from the anchors
+				reacting to the initial SYNC state. If no reactions is detected, the tag
+				reverts back to being an anchor */
+
+			/* Poll frame timeout*/
+			if (rx_done == 0){
+				if (checkTO(&last_sync_time, responses_timeout)){
 					if (!FORCE_TAG){
 						// restart the receiver and turn off transmitter
 						dwt_forcetrxoff();
 						dwt_rxenable(DWT_START_RX_IMMEDIATE);
 						last_recieve_time = millis();
-						printf("No devices left: Changing into anchor\n");
+						printf("No responses left: Changing into anchor\n");
 						state = TWR_SYNC_STATE_ANC;
-						device_crt = 0;
 						tag_mode = 0;
 						rx_timestamp_poll = 0;
 						tx_timestamp_response = 0;
@@ -521,46 +509,10 @@ int application_twr_pdoa_tag(void)
 						rx_done = 0;
 						continue;
 					} else {
-						// just keep looping. if forced as tag
-						device_crt = 0;
+						printf("Tag Poll timeout.\n");
+						state = TWR_ERROR_TAG;
 						continue;
 					}
-				}
-			} else {
-				// If there is still devices left, then access these 
-				printf("Next address\n");
-				memcpy(your_ID, &your_ID_list[device_crt*2], 2);
-				device_crt++;
-			}
-			//last_sync_time = millis(); // replaced HAL_GetTick() 
-			sync_frame.sequence_number = next_sequence_number++;
-			// Set the destination and source
-			memcpy(sync_frame.dst_address, your_ID, 2);
-			memcpy(sync_frame.src_address, my_ID, 2);
-			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
-			dwt_writetxfctrl(sizeof(sync_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
-
-			state = TWR_POLL_RESPONSE_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
-			int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-			if (r != DWT_SUCCESS) {
-				state = TWR_ERROR_TAG;
-				printf("TX ERR: could not send sync frame\n");
-				continue;
-			}
-			break;
-		case TWR_POLL_RESPONSE_STATE_TAG:
-			if (tx_done == 1) {
-				tx_done = 2;
-				printf("TX: Sync frame\n");
-				last_sync_time = millis();
-			}
-
-			/* Poll frame timeout*/
-			if (rx_done == 0 && tx_done == 2){
-				if (checkTO(&last_sync_time, tag_sync_timeout)){
-					printf("Tag Poll timeout\n");
-					state = TWR_ERROR_TAG;
-					continue;
 				}
 			}
 
@@ -603,11 +555,8 @@ int application_twr_pdoa_tag(void)
 					continue;
 				}
 
-				if (memcmp(your_ID, rx_frame_pointer->src_address, 2) != 0) {
-					printf("RX ERR: wrong source address on poll frame\n");
-					state = TWR_ERROR_TAG;
-					continue;
-				}
+				// We got a poll from an random anchor - we want to finish the ranging with only this anchor
+				memcpy(your_ID, rx_frame_pointer->src_address, 2);
 
 				printf("RX: Poll frame\n");
 
@@ -618,7 +567,7 @@ int application_twr_pdoa_tag(void)
 				rx_done = 2;
 			}
 
-			if ((tx_done == 2) && (rx_done == 2)) {
+			if (rx_done == 2) {
 				tx_done = 0;
 				rx_done = 0;
 
@@ -761,19 +710,25 @@ int application_twr_pdoa_tag(void)
 				/* Rotate receiver */
 				twr_count++;
 
-				/* Begin next ranging exchange */
+				/* Begin next ranging exchange. We go back to the response state and await te delayed responses from the other anchors */
 				tx_done = 0;
 				rx_done = 0;
-				state = TWR_SYNC_STATE_TAG;
-
-				Sleep(100); // short pause after succesful exchange
+				last_sync_time = millis();
+				state = TWR_POLL_RESPONSE_STATE_TAG;
 			}
 			break;
 		case TWR_ERROR_TAG:
 			dwt_forcetrxoff();  // make sure receiver is off after an error
 			printf("Tag error -> reset\n");
-			state = TWR_SYNC_STATE_TAG;
+			if (FORCE_ANCHOR){
+				// If forced to be tag, send new sync
+				state = TWR_SYNC_STATE_TAG;
+			} else {
+				// otherwise, wait for anchor response
+				state = TWR_POLL_RESPONSE_STATE_TAG;
+			}
 			Sleep(2);
+			break;
 		}
 	}
 
