@@ -543,12 +543,14 @@ int application_twr_pdoa_tag(void)
 				rx_frame_pointer = (twr_base_frame_t *)rx_buffer;
 
 				if (rx_frame_pointer->twr_function_code != 0x21) { /* poll */
-					printf("RX ERR: wrong frame (expected poll)\n");
+					printf("RX ERR: wrong frame (expected poll) but got x%02x\n", rx_frame_pointer->twr_function_code);
 					state = TWR_ERROR_TAG;
 					continue;
 				}
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
+					// the poll frame should dictate sequence number rather than sync. Maybe remove this check
+					// and instead assign the current sequence number to the one embedded in this message
 					printf("RX ERR: wrong sequence number\n");
 					state = TWR_ERROR_TAG;
 					continue;
