@@ -17,6 +17,7 @@
 #include <port.h>
 #include "uart_stdio.h"
 #include <wiringPi.h> // for getting time in milliseconds
+#include <time.h>
 #include <assert.h> // for static_assert
 #include <math.h> // for calculating aoa
 
@@ -217,7 +218,7 @@ int application_twr_pdoa_tag(void)
     uint16_t twr_count = 0;
 
 	/*Assign random ID to each device*/
-	srand(millis());
+	srand(time(NULL));
 	uint8_t my_ID[2]; // ID of tag
 	uint8_t your_ID[2]; // ID of destination
 	my_ID[0] = rand() % 256;
