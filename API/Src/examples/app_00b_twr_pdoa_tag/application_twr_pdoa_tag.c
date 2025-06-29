@@ -47,23 +47,6 @@ volatile unsigned int last_recieve_time;
 
 char print_buffer[128];
 
-/* Default communication configuration. We use default non-STS DW mode. */
-static dwt_config_t config02 = {
-    5,               /* Channel number. */
-    DWT_PLEN_128,    /* Preamble length. Used in TX only. */
-    DWT_PAC8,        /* Preamble acquisition chunk size. Used in RX only. */
-    9,               /* TX preamble code. Used in TX only. */
-    9,               /* RX preamble code. Used in RX only. */
-    1,               /* 0 to use standard 8 symbol SFD, 1 to use non-standard 8 symbol, 2 for non-standard 16 symbol SFD and 3 for 4z 8 symbol SDF type */
-    DWT_BR_6M8,      /* Data rate. */
-    DWT_PHRMODE_STD, /* PHY header mode. */
-    DWT_PHRRATE_STD, /* PHY header rate. */
-    (129 + 8 - 8),   /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */
-    DWT_STS_MODE_OFF, /* STS disabled */
-    DWT_STS_LEN_64,/* STS length see allowed values in Enum dwt_sts_lengths_e */
-    DWT_PDOA_M0      /* PDOA mode off */
-};
-
 twr_base_frame_t sync_frame = {
 		{ 0x41, 0x88 },	/* Frame Control: data frame, short addresses */
 		0,				/* Sequence number */
@@ -188,7 +171,7 @@ int application_twr_pdoa_tag(void)
     dwt_setleds(DWT_LEDS_ENABLE | DWT_LEDS_INIT_BLINK);
 
     /* Configure DW IC. */
-    if(dwt_configure(&config02)) /* if the dwt_configure returns DWT_ERROR either the PLL or RX calibration has failed the host should reset the device */
+    if(dwt_configure(&config)) /* if the dwt_configure returns DWT_ERROR either the PLL or RX calibration has failed the host should reset the device */
     {
     	printf("CONFIG FAILED\n");
         while (1)
@@ -303,14 +286,12 @@ int application_twr_pdoa_tag(void)
 					continue;
 				}
 
-				/* This has been commented outs since we dont use STS
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { // >= 0 good STS, < 0 bad STS 
 					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR_ANC;
 					continue;
 				}
-				*/
 
 				dwt_readrxdata(rx_buffer, new_frame_length, 0);
 				/* We assume this is a TWR frame, but not necessarily the right one */
@@ -399,13 +380,13 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_ANC;
 					continue;
 				}
-				/*
+				
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { // >= 0 good STS, < 0 bad STS 
 					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR_ANC;
 					continue;
-				} */
+				} 
 
 				dwt_readrxdata(rx_buffer, new_frame_length, 0);
 				/* We assume this is a TWR frame, but not necessarily the right one */
@@ -592,13 +573,13 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_TAG;
 					continue;
 				}
-				/*
+				
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { // >= 0 good STS, < 0 bad STS 
 					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR_TAG;
 					continue;
-				} */
+				} 
 
 				dwt_readrxdata(rx_buffer, new_frame_length, 0);
 				/* We assume this is a TWR frame, but not necessarily the right one */
@@ -687,13 +668,13 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_TAG;
 					continue;
 				}
-				/*
+				
 				int sts_quality = dwt_readstsquality(&sts_quality_index);
 				if (sts_quality < 0) { // >= 0 good STS, < 0 bad STS 
 					printf("RX ERR: bad STS quality\n");
 					state = TWR_ERROR_TAG;
 					continue;
-				}*/
+				}
 
 				dwt_readrxdata(rx_buffer, new_frame_length, 0);
 				/* For simplicity we assume this is a TWR frame, but not necessarily the right one */
@@ -773,7 +754,7 @@ int application_twr_pdoa_tag(void)
 
 				/* Transmit human readable for debugging */
 				dist_sum += dist_mm;
-				float dist_mean = dist_sum/(twr_count*1000); // mean distance in meters
+				float dist_mean = dist_sum/((twr_count+1)*1000); // mean distance in meters
 				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_m: %.2f, mean dist: %.2f \n", twr_count, ((float)dist_mm)/1000, dist_mean);
 				printf(print_buffer);
 
