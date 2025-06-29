@@ -461,7 +461,6 @@ int application_twr_pdoa_tag(void)
 		case TWR_ERROR_ANC:
 			printf("Anchor error -> reset\n");
 			state = TWR_SYNC_STATE_ANC;
-			Sleep(2);
 			dwt_rxenable(DWT_START_RX_IMMEDIATE);
 			break;
 
@@ -725,7 +724,7 @@ int application_twr_pdoa_tag(void)
 			}
 			break;
 		case TWR_ERROR_TAG:
-			dwt_forcetrxoff();  // make sure receiver is off after an error
+			//dwt_forcetrxoff();  // make sure receiver is off after an error
 			printf("Tag error -> reset\n");
 			if (FORCE_ANCHOR){
 				// If forced to be tag, send new sync
@@ -734,7 +733,6 @@ int application_twr_pdoa_tag(void)
 				// otherwise, wait for anchor response
 				state = TWR_POLL_RESPONSE_STATE_TAG;
 			}
-			Sleep(2);
 			break;
 		}
 	}
