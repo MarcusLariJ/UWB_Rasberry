@@ -28,7 +28,7 @@
 #if defined(APP_TWR_PDOA)
 
 #define DEVICE_MAX_NUM 10 // number of expected devices to communicate with
-#define FORCE_ANCHOR 0 // Force the device to be an anchor and never enter tag mode
+#define FORCE_ANCHOR 1 // Force the device to be an anchor and never enter tag mode
 #define FORCE_TAG 0 // Force the device to be a tag
 
 // antenna delays for calibration
