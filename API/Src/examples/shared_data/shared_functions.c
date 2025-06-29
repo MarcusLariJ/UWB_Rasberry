@@ -482,6 +482,14 @@ int32_t decode_24bit(const uint8_t* buffer) {
 	return value;
 }
 
+uint32_t decode_32bit_timestamp(const uint8_t buffer[4]) {
+	/* combine four bytes into one integer */
+	const uint32_t value = ((uint64_t)buffer[0]) \
+							+ ((uint64_t)buffer[1] << 8) \
+							+ ((uint64_t)buffer[2] << 16) \
+							+ ((uint64_t)buffer[3] << 24);
+	return value;
+}
 
 uint64_t decode_40bit_timestamp(const uint8_t buffer[5]) {
 	/* combine five bytes into one integer */
