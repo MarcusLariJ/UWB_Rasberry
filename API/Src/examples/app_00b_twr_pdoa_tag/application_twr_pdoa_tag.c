@@ -132,10 +132,10 @@ uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 static const uint64_t round_tx_delay = 1000llu*US_TO_DWT_TIME;  // reply time (1ms)
 static const unsigned int tag_sync_timeout = 10; // How much time before the tag stops looking for a response
 static const unsigned int anc_resp_timeout = 10; // How much time before the anchor stops looking for a response
-static const unsigned int min_tx_timeout = 10; // min timout value - the minimum time a node at least has to attempt being an anchor
-static const unsigned int max_tx_timeout = 2000; // 20 ms. Adjust according to how many tags are active at once
-static const unsigned int max_poll_timeout = 1000; // 10 ms. Max time to wait before attempting to transmit poll
-static const unsigned int responses_timeout = max_tx_timeout; // when the tag should stop waiting for responses. Larger than normal timeout, to catch late anchors.
+static const unsigned int min_tx_timeout = 20; // min timout value - the minimum time a node at least has to attempt being an anchor
+static const unsigned int max_tx_timeout = 1000; // 20 ms. Adjust according to how many tags are active at once
+static const unsigned int max_poll_timeout = 10; // 10 ms. Max time to wait before attempting to transmit poll
+static const unsigned int responses_timeout = max_poll_timeout; // when the tag should stop waiting for responses. Should be way smaller than max_tx_timeout, to avoid to simostanously tags
 unsigned int tx_timeout = min_tx_timeout + max_tx_timeout/2; // the initial timeout, before reverting to tag
 unsigned int poll_timeout = 0; // The time to wait before attempting to transmit poll
 
