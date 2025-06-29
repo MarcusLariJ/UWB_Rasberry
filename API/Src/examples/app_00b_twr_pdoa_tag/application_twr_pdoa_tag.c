@@ -130,10 +130,10 @@ uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
 static const uint64_t round_tx_delay = 1000llu*US_TO_DWT_TIME;  // reply time (1ms)
-static const unsigned int tag_sync_timeout = 10; // 10 ms
-static const unsigned int anc_resp_timeout = 10; // slightly smaller than sync timeout
+static const unsigned int tag_sync_timeout = 10; // How much time before the tag stops looking for a response
+static const unsigned int anc_resp_timeout = 10; // How much time before the anchor stops looking for a response
 static const unsigned int min_tx_timeout = 5; // min timout value
-static const unsigned int max_tx_timeout = 20; // 20 ms. Adjust according to how many tags are active at once
+static const unsigned int max_tx_timeout = 2000; // 20 ms. Adjust according to how many tags are active at once
 static const unsigned int responses_timeout = max_tx_timeout; // when the tag should stop waiting for responses. Larger than normal timeout, to catch late anchors.
 unsigned int tx_timeout = min_tx_timeout + max_tx_timeout/2; // the timeout, before reverting to anchor
 
