@@ -103,6 +103,9 @@ void resp_msg_set_ts(uint8_t *ts_field, const uint64_t ts);
 /* Decode a 24-bit number stored in a 3-byte uint8_t array */
 int32_t decode_24bit(const uint8_t* buffer);
 
+/* Decode a 32-bit number stored in a 4-byte uint8_t array */
+uint32_t decode_32bit_timestamp(const uint8_t buffer[4]);
+
 /* Decode a 40-bit number stored in a 5-byte uint8_t array */
 uint64_t decode_40bit_timestamp(const uint8_t buffer[5]);
 
