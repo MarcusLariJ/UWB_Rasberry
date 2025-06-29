@@ -136,7 +136,7 @@ static const unsigned int min_tx_timeout = 10; // min timout value - the minimum
 static const unsigned int max_tx_timeout = 2000; // 20 ms. Adjust according to how many tags are active at once
 static const unsigned int max_poll_timeout = 1000; // 10 ms. Max time to wait before attempting to transmit poll
 static const unsigned int responses_timeout = max_tx_timeout; // when the tag should stop waiting for responses. Larger than normal timeout, to catch late anchors.
-unsigned int tx_timeout = min_tx_timeout + max_tx_timeout/2; // the timeout, before reverting to anchor
+unsigned int tx_timeout = min_tx_timeout + max_tx_timeout/2; // the initial timeout, before reverting to tag
 unsigned int poll_timeout = 0; // The time to wait before attempting to transmit poll
 
 void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
@@ -295,7 +295,7 @@ int application_twr_pdoa_tag(void)
 
 				state = TWR_WAIT_FOR_CLEAR_STATE_ANC;
 				/*set the random poll response time*/
-				poll_timeout = (rand() % (max_tx_timeout+1));
+				poll_timeout = (rand() % (max_poll_timeout+1));
 				
 				/* Set the expected source to that of the incoming messages source, to ignore all other messages*/
 				memcpy(your_ID, rx_frame_pointer->src_address, 2);
