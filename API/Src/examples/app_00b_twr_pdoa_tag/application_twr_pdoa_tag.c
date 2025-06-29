@@ -723,16 +723,18 @@ int application_twr_pdoa_tag(void)
 				rx_done = 0;
 				last_sync_time = millis();
 				state = TWR_POLL_RESPONSE_STATE_TAG;
+				if (FORCE_TAG){Sleep(100);} // just to slow down the measurements a bit when running tag only
 			}
 			break;
 		case TWR_ERROR_TAG:
-			//dwt_forcetrxoff();  // make sure receiver is off after an error
 			printf("Tag error -> reset\n");
 			if (FORCE_TAG){
 				// If forced to be tag, send new sync
+				dwt_forcetrxoff(); // reset, so we can send new message
+				Sleep(10);
 				state = TWR_SYNC_STATE_TAG;
 			} else {
-				// otherwise, wait for anchor response
+				// otherwise, wait for anchor response (dont reset trx here, as we want to stay in receive mode)
 				state = TWR_POLL_RESPONSE_STATE_TAG;
 			}
 			break;
