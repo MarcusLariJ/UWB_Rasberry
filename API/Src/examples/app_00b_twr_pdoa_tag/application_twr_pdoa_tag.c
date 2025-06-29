@@ -460,7 +460,7 @@ int application_twr_pdoa_tag(void)
 
 				// include antenna delay in final timestamp. Remember to remove lower 9 bits, 
 				// since this is what setdelayedtrx does - if this is neglcted, you get some bad noise
-				tx_timestamp_final = (((rx_timestamp_response + round_tx_delay + TX_ANT_DLY) >> 9) << 9);
+				tx_timestamp_final = (((rx_timestamp_response + round_tx_delay) >> 9) << 9) + TX_ANT_DLY;
 
 				uint32_t tx_timestamp_poll_32 = (uint32_t)tx_timestamp_poll;
 				uint32_t rx_timestamp_response_32 = (uint32_t)rx_timestamp_response;
