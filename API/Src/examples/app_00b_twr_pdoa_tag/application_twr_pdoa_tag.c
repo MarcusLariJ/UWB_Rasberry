@@ -728,7 +728,7 @@ int application_twr_pdoa_tag(void)
 		case TWR_ERROR_TAG:
 			//dwt_forcetrxoff();  // make sure receiver is off after an error
 			printf("Tag error -> reset\n");
-			if (FORCE_ANCHOR){
+			if (FORCE_TAG){
 				// If forced to be tag, send new sync
 				state = TWR_SYNC_STATE_TAG;
 			} else {
