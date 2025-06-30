@@ -114,6 +114,20 @@ inline void csv_write_twr(uint64_t Treply1, uint64_t Treply2, uint64_t Tround1, 
     fflush(logfile);
 }
 
+inline void csv_write_rx2(uint64_t ts, uint16_t id, float pdoa_rx, float pdoa_tx, int64_t tdoa, float current_rotation){
+    // type 2: rx data for pdoa/tdoa with timestamp and id:
+    fprintf(logfile, "2, %lu, %u, %f, %f, %ld, %f", ts, id, pdoa_rx, pdoa_tx, tdoa, current_rotation);
+    fputc('\n', logfile);
+    fflush(logfile);
+}
+
+inline void csv_write_twr2(uint64_t ts, uint16_t id, uint64_t Treply1, uint64_t Treply2, uint64_t Tround1, uint64_t Tround2, uint64_t dist_mm, uint16_t twr_count, uint16_t current_rotation){
+    // type 3: twr data with timestamp and anchor ID
+    fprintf(logfile, "3, %lu, %u, %lu, %lu, %lu, %lu, %lu, %u, %u", ts, id, Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
+    fputc('\n', logfile);
+    fflush(logfile);
+}
+
 inline void csv_write_CIR(const uint8_t *data, uint16_t length, uint16_t offset){
     // type 2: CIR data
     fprintf(logfile, "2");

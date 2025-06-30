@@ -51,6 +51,10 @@ void csv_write_twr(uint64_t Treply1, uint64_t Treply2, uint64_t Tround1, uint64_
 
 void csv_write_CIR(const uint8_t *data, uint16_t length, uint16_t offset);
 
+void csv_write_rx2(uint64_t ts, uint16_t id, float pdoa_rx, float pdoa_tx, int64_t tdoa, float current_rotation);
+
+void csv_write_twr2(uint64_t ts, uint16_t id, uint64_t Treply1, uint64_t Treply2, uint64_t Tround1, uint64_t Tround2, uint64_t dist_mm, uint16_t twr_count, uint16_t current_rotation);
+
 #ifdef __cplusplus
 }
 #endif

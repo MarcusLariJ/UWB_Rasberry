@@ -18,7 +18,6 @@
 #include <deca_spi.h>
 #include <port.h>
 #include "uart_stdio.h"
-#include <wiringPi.h> // for getting time in milliseconds
 #include <time.h>
 #include <assert.h> // for static_assert
 #include <math.h> // for calculating aoa
@@ -30,8 +29,8 @@
 #if defined(APP_TWR_PDOA)
 
 #define DEVICE_MAX_NUM 10 // number of expected devices to communicate with
-#define FORCE_ANCHOR 1 // Force the device to be an anchor and never enter tag mode
-#define FORCE_TAG 0 // Force the device to be a tag
+#define FORCE_ANCHOR 0 // Force the device to be an anchor and never enter tag mode
+#define FORCE_TAG 1 // Force the device to be a tag
 
 // antenna delays for calibration
 #define TX_ANT_DLY (16385)
@@ -46,7 +45,7 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data);
 volatile uint8_t rx_done = 0;  /* Flag to indicate a new frame was received from the interrupt */
 volatile uint16_t new_frame_length = 0;
 volatile uint8_t tx_done = 0;
-volatile unsigned int last_recieve_time;
+volatile uint64_t last_recieve_time;
 
 char print_buffer[128];
 
@@ -113,6 +112,7 @@ uint8_t tdoa_rx[5];
 uint8_t next_sequence_number = 0;
 uint8_t sync_sequence_number = 0;
 float dist_sum = 0;
+uint8_t init_mode = 0;
 
 
 enum state_t {
@@ -132,18 +132,20 @@ enum state_t state = TWR_SYNC_STATE_ANC;
 
 /* timeout before the ranging exchange will be abandoned and restarted */
 static const uint64_t round_tx_delay = 1000llu*US_TO_DWT_TIME;  // reply time (1ms)
-  			 unsigned int tag_sync_timeout = 10; // How much time before the tag stops looking for a response
-static const unsigned int anc_resp_timeout = 10; // How much time before the anchor stops looking for a response
-static const unsigned int min_tx_timeout = 20; // min timout value - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
-static const unsigned int max_tx_timeout = 1000; // 20 ms. Adjust according to how many tags are active at once
-static const unsigned int max_poll_timeout = 10; // 10 ms. Max time to wait before attempting to transmit poll
-static const unsigned int responses_timeout = max_poll_timeout+1; // when the tag should stop waiting for responses. Should be smaller than min_tx_timeout, to avoid to simostanously tags. +1 to make sure it can catch late polls
-unsigned int tx_timeout = min_tx_timeout + max_tx_timeout/2; // the initial timeout, before reverting to tag
-unsigned int poll_timeout = 0; // The time to wait before attempting to transmit poll
+  			 uint64_t tag_sync_timeout = 10000; // How much time before the tag stops looking for a response (us)
+static const uint64_t anc_resp_timeout = 10000; // How much time before the anchor stops looking for a response (us)
+static const uint64_t min_tx_timeout = 20000; // min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
+static const uint64_t max_tx_timeout = 1000000; // 20 ms. Adjust according to how many tags are active at once
+static const uint64_t max_poll_timeout = 10000; // 10 ms. Max time in us to wait before attempting to transmit poll
+static const uint64_t responses_timeout = max_poll_timeout+1000; // when the tag should stop waiting for responses. Should be smaller than min_tx_timeout, to avoid to simostanously tags. +1 to make sure it can catch late polls
+			 uint64_t tx_timeout = min_tx_timeout + max_tx_timeout/2; // the initial timeout, before reverting to tag
+			 uint64_t poll_timeout = 0; // The time to wait before attempting to transmit poll
 
-void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
+void transmit_rx_diagnostics(uint64_t ts, uint16_t id, float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa);
 void print_hex(const uint8_t *bytes, size_t length);
-int8_t checkTO(unsigned int * last_time, unsigned int timeout);
+uint64_t get_time_us();
+
+int8_t checkTO(uint64_t * last_time, uint64_t timeout);
 /**
  * Application entry point.
  */
@@ -215,8 +217,8 @@ int application_twr_pdoa_tag(void)
     twr_base_frame_t *rx_frame_pointer;
     twr_final_frame_t *rx_final_frame_pointer;
     int16_t sts_quality_index;
-    unsigned int last_sync_time = millis(); // replaced HAL_GetTick();
-	last_recieve_time = millis();
+    uint64_t last_sync_time = get_time_us(); // replaced HAL_GetTick();
+	last_recieve_time = get_time_us();
 
     float current_rotation = 0;
     uint16_t twr_count = 0;
@@ -236,10 +238,13 @@ int application_twr_pdoa_tag(void)
 		state = TWR_SYNC_STATE_TAG;
 		dwt_forcetrxoff(); // this is important - receivemode needs to be disabled to tx
 		tag_sync_timeout = 1000; // special case - we want to be patient when we are the only tag
+		init_mode = 0;
 		printf("Device set as tag.\n");
 	}
 	printf("Wait 3s before starting...\n");
     Sleep(3000);
+
+	uint64_t start_time = get_time_us();
 
 	while (1)
 	{
@@ -250,7 +255,7 @@ int application_twr_pdoa_tag(void)
 		case TWR_SYNC_STATE_ANC:
 			/* If device is forced to be an anchor only, then never change over to tag */
 			if (!FORCE_ANCHOR){
-				if ((millis() - last_recieve_time) > tx_timeout) {
+				if ((get_time_us() - last_recieve_time) > tx_timeout) {
 					/* If it is time to transmit: */
 					dwt_forcetrxoff();
 					/* Calculate random timeout time, centered around the average*/
@@ -262,6 +267,7 @@ int application_twr_pdoa_tag(void)
 					tx_timestamp_final = 0;
 					tx_done = 0;
 					rx_done = 0;
+					init_mode = 1;
 					continue;
 				}
 			}
@@ -315,7 +321,8 @@ int application_twr_pdoa_tag(void)
 		case TWR_WAIT_FOR_CLEAR_STATE_ANC:
 			
 			// wait for clear airwaves before attempting to respond:
-			if ((millis() - last_recieve_time) > poll_timeout){
+			// another timeout can be added here in case the airwaves never become clear, to avoid the node being stauck waiting to tarnsmit 
+			if ((get_time_us() - last_recieve_time) > poll_timeout){
 				// Clear! now transmit:
 				/* Send poll frame (2/4) */
 				printf("Airwaves are clear.Preparing to send poll...\n");
@@ -327,13 +334,17 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_ANC;
 					continue;
 				}
+			} else if (rx_done==1){
+				// We have received a message. Just discard it and restart the receiver
+				rx_done = 0;
+				dwt_rxenable(DWT_START_RX_IMMEDIATE);
 			}
 			break;
 		case TWR_POLL_RESPONSE_STATE_ANC:
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Poll frame\n");
-				last_sync_time = millis();
+				last_sync_time = get_time_us();
 			}
 
 			/* check timeout for response frame*/
@@ -493,7 +504,7 @@ int application_twr_pdoa_tag(void)
 			if (tx_done == 1) {
 				state = TWR_POLL_RESPONSE_STATE_TAG;
 				printf("TX: Sync frame\n");
-				last_sync_time = millis();
+				last_sync_time = get_time_us();
 			}
 			break;
 		case TWR_POLL_RESPONSE_STATE_TAG:
@@ -508,7 +519,7 @@ int application_twr_pdoa_tag(void)
 						// restart the receiver and turn off transmitter
 						dwt_forcetrxoff();
 						dwt_rxenable(DWT_START_RX_IMMEDIATE);
-						last_recieve_time = millis();
+						last_recieve_time = get_time_us();
 						printf("No responses left: Changing into anchor\n");
 						state = TWR_SYNC_STATE_ANC;
 						rx_timestamp_poll = 0;
@@ -516,6 +527,7 @@ int application_twr_pdoa_tag(void)
 						rx_timestamp_final = 0;
 						tx_done = 0;
 						rx_done = 0;
+						init_mode = 0;
 						continue;
 					} else {
 						printf("Tag Poll timeout.\n");
@@ -606,7 +618,7 @@ int application_twr_pdoa_tag(void)
 			if (tx_done == 1) {
 				tx_done = 2;
 				printf("TX: Response frame\n");
-				last_sync_time = millis();
+				last_sync_time = get_time_us();
 			}
 			
 			/* check timeout for response frame*/
@@ -711,8 +723,10 @@ int application_twr_pdoa_tag(void)
 				print_hex(your_ID, 2);
 
 				// Write to log CSV file
-				csv_write_twr(Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
-				transmit_rx_diagnostics(current_rotation, pdoa_rx, pdoa_tx, tdoa_rx); // log true rotation, measured pdoa and tdoa
+				uint64_t log_ts = get_time_us() - start_time; // get timestamp for measurement
+				uint16_t your_ID16 = (uint16_t)your_ID[0] + ((uint16_t)your_ID[1] << 8); // convert id to 16 bit
+				csv_write_twr2(log_ts, your_ID16, Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
+				transmit_rx_diagnostics(log_ts, your_ID16, current_rotation, pdoa_rx, pdoa_tx, tdoa_rx); // log true rotation, measured pdoa and tdoa
 
 				/* Transmit human readable for debugging */
 				dist_sum += dist_mm;
@@ -726,9 +740,11 @@ int application_twr_pdoa_tag(void)
 				/* Begin next ranging exchange. We go back to the response state and await te delayed responses from the other anchors */
 				tx_done = 0;
 				rx_done = 0;
-				last_sync_time = millis();
+				last_sync_time = get_time_us();
 				state = TWR_POLL_RESPONSE_STATE_TAG;
-				if (FORCE_TAG){Sleep(100);} // just to slow down the measurements a bit when running tag only
+				/*Enable receiver, in order to look for next poll*/
+				dwt_rxenable(DWT_START_RX_IMMEDIATE);
+				if (FORCE_TAG){Sleep(10);} // just to slow down the measurements a bit when running tag only
 			}
 			break;
 		case TWR_ERROR_TAG:
@@ -740,6 +756,7 @@ int application_twr_pdoa_tag(void)
 				state = TWR_SYNC_STATE_TAG;
 			} else {
 				// otherwise, wait for anchor response (dont reset trx here, as we want to stay in receive mode)
+				dwt_rxenable(DWT_START_RX_IMMEDIATE);
 				state = TWR_POLL_RESPONSE_STATE_TAG;
 			}
 			break;
@@ -777,7 +794,7 @@ static void rx_ok_cb(const dwt_cb_data_t *cb_data)
 {
 	rx_done = 1;
 	new_frame_length = cb_data->datalength;
-	last_recieve_time = millis();
+	last_recieve_time = get_time_us();
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -792,15 +809,24 @@ static void rx_ok_cb(const dwt_cb_data_t *cb_data)
 static void rx_err_cb(const dwt_cb_data_t *cb_data)
 {
 	UNUSED(cb_data);
+	
+	printf("RX error");
+	if (init_mode) {
+		// if the node is an initator
+		state = TWR_ERROR_TAG;
+	} else {
+		// if the node is a responder
+		state = TWR_ERROR_ANC;
+	}
+	
 	/* restart rx on error */
 	dwt_forcetrxoff();
 	dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-int8_t checkTO(unsigned int * last_time, unsigned int timeout){
+int8_t checkTO(uint64_t * last_time, uint64_t timeout){
 		/* check ranging timeout and restart ranging if necessary  */
-		if ((millis() - *last_time) > timeout) { 
-			//*last_time = millis();
+		if ((get_time_us() - *last_time) > timeout) { 
 			rx_timestamp_poll = 0; // maybe delete all this
 			tx_timestamp_poll = 0;
 			rx_timestamp_response = 0;
@@ -816,7 +842,7 @@ int8_t checkTO(unsigned int * last_time, unsigned int timeout){
 }
 
 
-void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa) {
+void transmit_rx_diagnostics(uint64_t ts, uint16_t id, float current_rotation, int16_t pdoa_rx, int16_t pdoa_tx, uint8_t * tdoa) {
 	// Readable pdoa stuff
 	float pdoa_read_rx = ((float)pdoa_rx / (1 << 11));
 	float pdoa_read_tx = ((float)pdoa_tx / (1 << 11));
@@ -840,7 +866,7 @@ void transmit_rx_diagnostics(float current_rotation, int16_t pdoa_rx, int16_t pd
 	snprintf(print_buffer, sizeof(print_buffer), "raw pdoa rx: %.6f, raw pdoa tx: %.6f, tdoa: %ld, aoa: %.6f, True angle: %.1f \n",  pdoa_read_rx, pdoa_read_tx, tdoa_read, eq_aoa, current_rotation);
 	printf(print_buffer);
 
-	csv_write_rx(pdoa_read_rx, tdoa_read, current_rotation);
+	csv_write_rx2(ts, id, pdoa_read_rx, pdoa_read_tx, tdoa_read, current_rotation);
 }
 
 void print_hex(const uint8_t *bytes, size_t length) {
@@ -848,6 +874,13 @@ void print_hex(const uint8_t *bytes, size_t length) {
 		printf("%02X ", bytes[i]);
 	}
 	printf("\n");
+}
+
+uint64_t get_time_us(){
+	// returns the current time in us since the system clock started
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (uint64_t)ts.tv_sec*1000000UL + (uint64_t)ts.tv_nsec/1000;
 }
 
 #endif
