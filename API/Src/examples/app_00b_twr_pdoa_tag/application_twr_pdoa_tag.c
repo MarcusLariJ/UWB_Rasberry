@@ -28,7 +28,7 @@
 #if defined(APP_TWR_PDOA)
 
 #define DEVICE_MAX_NUM 10 // number of expected devices to communicate with
-#define FORCE_ANCHOR 1 // Force the device to be an anchor and never enter tag mode
+#define FORCE_ANCHOR 0 // Force the device to be an anchor and never enter tag mode
 #define FORCE_TAG 0 // Force the device to be a tag
 
 // antenna delays for calibration
@@ -109,6 +109,7 @@ int16_t pdoa_tx = 0;
 uint8_t tdoa_rx[5];
 
 uint8_t next_sequence_number = 0;
+uint8_t sync_sequence_number = 0;
 float dist_sum = 0;
 
 
@@ -126,7 +127,6 @@ enum state_t {
 };
 
 enum state_t state = TWR_SYNC_STATE_ANC;
-uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
 static const uint64_t round_tx_delay = 1000llu*US_TO_DWT_TIME;  // reply time (1ms)
@@ -254,7 +254,6 @@ int application_twr_pdoa_tag(void)
 					/* Calculate random timeout time, centered around the average*/
 					tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
 					printf("Changing into tag\n");
-					tag_mode = 1;
 					state = TWR_SYNC_STATE_TAG; // We become a tag
 					tx_timestamp_poll = 0;
 					rx_timestamp_response = 0;
@@ -471,7 +470,9 @@ int application_twr_pdoa_tag(void)
 
 		case TWR_SYNC_STATE_TAG:
 			/* Send sync frame (1/4) */
-			sync_frame.sequence_number = next_sequence_number++; // maybe sync does not need to keep track of sequence? it breaks exchanges afterwards.
+			sync_frame.sequence_number = next_sequence_number++; 
+			/*Remember this sequence number, so we can reset back to it when initiating a ranging with a new anchor from this sync message*/
+			sync_sequence_number = next_sequence_number; 
 			// Set the source. Destination does not matter (Sync initiates ranging with all anchors)
 			memcpy(sync_frame.src_address, my_ID, 2);
 			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
@@ -508,7 +509,6 @@ int application_twr_pdoa_tag(void)
 						last_recieve_time = millis();
 						printf("No responses left: Changing into anchor\n");
 						state = TWR_SYNC_STATE_ANC;
-						tag_mode = 0;
 						rx_timestamp_poll = 0;
 						tx_timestamp_response = 0;
 						rx_timestamp_final = 0;
@@ -526,6 +526,7 @@ int application_twr_pdoa_tag(void)
 			/* Wait for poll frame (2/4) */
 			if (rx_done == 1) {
 				rx_done = 0; /* reset */
+				next_sequence_number = sync_sequence_number; /* reset back to the original seqence number used for sync*/
 
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
 					printf("RX ERR: wrong frame length\n");
@@ -551,8 +552,6 @@ int application_twr_pdoa_tag(void)
 				}
 
 				if (rx_frame_pointer->sequence_number != next_sequence_number) {
-					// the poll frame should dictate sequence number rather than sync. Maybe remove this check
-					// and instead assign the current sequence number to the one embedded in this message
 					printf("RX ERR: wrong sequence number\n");
 					state = TWR_ERROR_TAG;
 					continue;
