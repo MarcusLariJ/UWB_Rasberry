@@ -717,7 +717,7 @@ int application_twr_pdoa_tag(void)
 				/* Transmit human readable for debugging */
 				dist_sum += dist_mm;
 				float dist_mean = dist_sum/((twr_count+1)*1000); // mean distance in meters
-				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_m: %.2f, mean dist: %.2f \n", twr_count, ((float)dist_mm)/1000, dist_mean);
+				snprintf(print_buffer, sizeof(print_buffer), "twr_count: %u, dist_m: %.3f, mean dist: %.3f \n", twr_count, ((float)dist_mm)/1000, dist_mean);
 				printf(print_buffer);
 
 				/* Rotate receiver */
