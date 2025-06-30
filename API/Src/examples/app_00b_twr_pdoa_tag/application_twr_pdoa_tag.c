@@ -130,7 +130,7 @@ uint8_t tag_mode = 0; // keeps track of if we are in tag (1) or anchor (0) mode
 
 /* timeout before the ranging exchange will be abandoned and restarted */
 static const uint64_t round_tx_delay = 1000llu*US_TO_DWT_TIME;  // reply time (1ms)
-static const unsigned int tag_sync_timeout = 10; // How much time before the tag stops looking for a response
+  			 unsigned int tag_sync_timeout = 10; // How much time before the tag stops looking for a response
 static const unsigned int anc_resp_timeout = 10; // How much time before the anchor stops looking for a response
 static const unsigned int min_tx_timeout = 20; // min timout value - the minimum time a node at least has to attempt being an anchor
 static const unsigned int max_tx_timeout = 1000; // 20 ms. Adjust according to how many tags are active at once
@@ -233,6 +233,7 @@ int application_twr_pdoa_tag(void)
 	if (FORCE_TAG) {
 		state = TWR_SYNC_STATE_TAG;
 		dwt_forcetrxoff(); // this is important - receivemode needs to be disabled to tx
+		tag_sync_timeout = 1000; // special case - we want to be patient when we are the only tag
 		printf("Device set as tag.\n");
 	}
 	printf("Wait 3s before starting...\n");
