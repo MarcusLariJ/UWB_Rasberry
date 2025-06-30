@@ -132,10 +132,10 @@ enum state_t state = TWR_SYNC_STATE_ANC;
 static const uint64_t round_tx_delay = 1000llu*US_TO_DWT_TIME;  // reply time (1ms)
   			 unsigned int tag_sync_timeout = 10; // How much time before the tag stops looking for a response
 static const unsigned int anc_resp_timeout = 10; // How much time before the anchor stops looking for a response
-static const unsigned int min_tx_timeout = 20; // min timout value - the minimum time a node at least has to attempt being an anchor
+static const unsigned int min_tx_timeout = 20; // min timout value - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
 static const unsigned int max_tx_timeout = 1000; // 20 ms. Adjust according to how many tags are active at once
 static const unsigned int max_poll_timeout = 10; // 10 ms. Max time to wait before attempting to transmit poll
-static const unsigned int responses_timeout = max_poll_timeout; // when the tag should stop waiting for responses. Should be way smaller than max_tx_timeout, to avoid to simostanously tags
+static const unsigned int responses_timeout = max_poll_timeout+1; // when the tag should stop waiting for responses. Should be smaller than min_tx_timeout, to avoid to simostanously tags. +1 to make sure it can catch late polls
 unsigned int tx_timeout = min_tx_timeout + max_tx_timeout/2; // the initial timeout, before reverting to tag
 unsigned int poll_timeout = 0; // The time to wait before attempting to transmit poll
 
