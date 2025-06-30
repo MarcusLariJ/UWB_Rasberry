@@ -34,8 +34,8 @@
 #define FORCE_TAG 0 // Force the device to be a tag
 
 // antenna delays for calibration
-#define TX_ANT_DLY (16385)
-#define RX_ANT_DLY (16385)
+#define TX_ANT_DLY (16385-5)
+#define RX_ANT_DLY (16385-5)
 
 extern dwt_txconfig_t txconfig_options;
 
