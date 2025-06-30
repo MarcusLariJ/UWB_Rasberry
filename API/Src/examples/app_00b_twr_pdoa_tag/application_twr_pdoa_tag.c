@@ -2,7 +2,9 @@
  * application_twr_pdoa_tag.c
  *
  *  Created on: July 14, 2022
- *      Author: Tobias Margiani
+ *      Author: Tobias Margiani 
+ *  Properly fixed and expanded on: July 1, 2025
+ * 		Author: Marcus lari Jørgensen
  */
 
 //#include "applications.h"
@@ -671,7 +673,7 @@ int application_twr_pdoa_tag(void)
 				/* Transmit measurement data */
 				current_rotation = getAngle(); // for debugging
 				pdoa_rx = dwt_readpdoa();
-				dwt_readtdoa(tdoa_rx); // the tdoa measurements are pretty much useless, since antennas are too close
+				dwt_readtdoa(tdoa_rx); // the tdoa measurements are pretty much useless, since antennas are too close. This can be removed
 
 				/* Accept frame continue with ranging */
 				next_sequence_number++;
@@ -704,6 +706,9 @@ int application_twr_pdoa_tag(void)
 				uint64_t dist_mm = (uint64_t)(tprop_ns*299.792458);  // usint c = 299.7... mm/ns
 
 				pdoa_tx = rx_final_frame_pointer->pdoa_tx;
+
+				printf("Finished ranging with node with address ");
+				print_hex(your_ID, 2);
 
 				// Write to log CSV file
 				csv_write_twr(Treply1, Treply2, Tround1, Tround2, dist_mm, twr_count, current_rotation);
