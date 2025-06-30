@@ -286,7 +286,7 @@ int application_twr_pdoa_tag(void)
 				rx_frame_pointer = (twr_base_frame_t *)rx_buffer;
 
 				if (rx_frame_pointer->twr_function_code != 0x20) {  /* ranging init */
-					printf("RX ERR: wrong frame (expected sync)\n");
+					printf("RX ERR: wrong frame (expected sync but got x%02x)\n", rx_frame_pointer->twr_function_code);
 					state = TWR_ERROR_ANC;
 					continue;
 				}
