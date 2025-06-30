@@ -30,12 +30,12 @@
 #if defined(APP_TWR_PDOA)
 
 #define DEVICE_MAX_NUM 10 // number of expected devices to communicate with
-#define FORCE_ANCHOR 1 // Force the device to be an anchor and never enter tag mode
-#define FORCE_TAG 0 // Force the device to be a tag
+#define FORCE_ANCHOR 0 // Force the device to be an anchor and never enter tag mode
+#define FORCE_TAG 1 // Force the device to be a tag
 
 // antenna delays for calibration
-#define TX_ANT_DLY (16385-2)
-#define RX_ANT_DLY (16385-2)
+#define TX_ANT_DLY (16385)
+#define RX_ANT_DLY (16385)
 
 extern dwt_txconfig_t txconfig_options;
 
