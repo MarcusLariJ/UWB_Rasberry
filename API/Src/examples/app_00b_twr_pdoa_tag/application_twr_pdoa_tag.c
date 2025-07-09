@@ -243,6 +243,11 @@ int application_twr_pdoa_tag(void)
 		init_mode = 0;
 		printf("Device set as tag.\n");
 	}
+
+	// Write device ID to CSV before starting
+	uint16_t my_ID16 = (uint16_t)my_ID[0] + ((uint16_t)my_ID[1] << 8);
+	csv_write_info(my_ID16, FORCE_ANCHOR, FORCE_TAG);
+
 	printf("Wait 3s before starting...\n");
     Sleep(3000);
 
@@ -474,6 +479,10 @@ int application_twr_pdoa_tag(void)
 				// update timeout after afinished exchange - incase the anchor is stuck with a bad high timeout
 				tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
 				last_recieve_time = get_time_us(); // might as well update the receive time afer succesful DS TWR
+				// write to log that a succesful exchange was made
+				uint64_t log_ts = get_time_us() - start_time; // get timestamp for measurement
+				uint16_t your_ID16 = (uint16_t)your_ID[0] + ((uint16_t)your_ID[1] << 8); // convert id to 16 bit
+				csv_write_id(log_ts, your_ID16);
 			}
 			break;
 		case TWR_ERROR_ANC:

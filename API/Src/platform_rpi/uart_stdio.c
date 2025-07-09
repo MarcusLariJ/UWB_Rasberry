@@ -128,6 +128,20 @@ inline void csv_write_twr2(uint64_t ts, uint16_t id, uint64_t Treply1, uint64_t 
     fflush(logfile);
 }
 
+inline void csv_write_id(uint64_t ts, uint16_t id){
+    // type 4: Timestamp and id from initiator 
+    fprintf(logfile, "4, %lu, %u", ts, id);
+    fputc('\n', logfile);
+    fflush(logfile);
+}
+
+inline void csv_write_info(uint16_t id, uint8_t anchor, uint8_t tag){
+    // type 5: info regarding node: ID, and if it is forced as tag or anchor.
+    fprintf(logfile, "5, %u, %u, %u", id, anchor, tag);
+    fputc('\n', logfile);
+    fflush(logfile);
+}
+
 inline void csv_write_CIR(const uint8_t *data, uint16_t length, uint16_t offset){
     // type 2: CIR data
     fprintf(logfile, "2");

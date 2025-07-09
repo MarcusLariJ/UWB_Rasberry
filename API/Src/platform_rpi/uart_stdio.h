@@ -55,6 +55,10 @@ void csv_write_rx2(uint64_t ts, uint16_t id, float pdoa_rx, float pdoa_tx, int64
 
 void csv_write_twr2(uint64_t ts, uint16_t id, uint64_t Treply1, uint64_t Treply2, uint64_t Tround1, uint64_t Tround2, uint64_t dist_mm, uint16_t twr_count, uint16_t current_rotation);
 
+void csv_write_id(uint64_t ts, uint16_t id);
+
+void csv_write_info(uint16_t id, uint8_t anchor, uint8_t tag);
+
 #ifdef __cplusplus
 }
 #endif
