@@ -360,7 +360,7 @@ int application_twr_pdoa_tag(void)
 
 			/* Wait for response frame (3/4) */
 			if (rx_done == 1) {
-				printf("%lu\n", last_recieve_time);
+				printf("recv time was%lu\n", last_recieve_time);
 				rx_done = 0; /* reset */
 
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
@@ -474,6 +474,7 @@ int application_twr_pdoa_tag(void)
 				state = TWR_SYNC_STATE_ANC;
 				// update timeout after afinished exchange - incase the anchor is stuck with a bad high timeout
 				tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
+				printf("recv this time was%lu\n", last_recieve_time);
 			}
 			break;
 		case TWR_ERROR_ANC:
@@ -799,7 +800,7 @@ static void rx_ok_cb(const dwt_cb_data_t *cb_data)
 	rx_done = 1;
 	new_frame_length = cb_data->datalength;
 	last_recieve_time = get_time_us();
-	printf("%lu\n", last_recieve_time);
+	printf("set rcv time to %lu\n", last_recieve_time);
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
