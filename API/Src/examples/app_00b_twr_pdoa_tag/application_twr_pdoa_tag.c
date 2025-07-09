@@ -135,7 +135,7 @@ static const uint64_t round_delay_us = 1000; // reply time (1ms)
 static const uint64_t round_tx_delay = round_delay_us*US_TO_DWT_TIME; // reply time in dut 
   			 uint64_t tag_sync_timeout = 10000; //(10 ms) How much time before the tag stops looking for a response (us)
 static const uint64_t anc_resp_timeout = 10000; //(10 ms) How much time before the anchor stops looking for a response (us)
-static const uint64_t min_tx_timeout = 100000; // (20 ms) min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
+static const uint64_t min_tx_timeout = 1000000; // (20 ms) min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
 static const uint64_t max_tx_timeout = 20000; // (20 ms). Max timeout calue is this + min timeout. Adjust according to how many tags are active at once
 static const uint64_t min_poll_timeout = round_delay_us; // min time to wait before transmitting poll
 static const uint64_t max_poll_timeout = 5000; // 5 ms. Max time in us to wait before attempting to transmit poll
@@ -360,6 +360,7 @@ int application_twr_pdoa_tag(void)
 
 			/* Wait for response frame (3/4) */
 			if (rx_done == 1) {
+				printf(last_recieve_time);
 				rx_done = 0; /* reset */
 
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
@@ -516,7 +517,8 @@ int application_twr_pdoa_tag(void)
 
 			/* Poll frame timeout*/
 			if (rx_done == 0){
-				if (checkTO(&last_sync_time, responses_timeout)){
+				// change to anchor if no response
+				if (get_time_us() - last_sync_time > responses_timeout){
 					if (!FORCE_TAG){
 						// restart the receiver and turn off transmitter
 						dwt_forcetrxoff();
@@ -797,6 +799,7 @@ static void rx_ok_cb(const dwt_cb_data_t *cb_data)
 	rx_done = 1;
 	new_frame_length = cb_data->datalength;
 	last_recieve_time = get_time_us();
+	printf(last_recieve_time);
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------
