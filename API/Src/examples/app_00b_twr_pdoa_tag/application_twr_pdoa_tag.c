@@ -135,11 +135,11 @@ static const uint64_t round_delay_us = 1000; // reply time (1ms)
 static const uint64_t round_tx_delay = round_delay_us*US_TO_DWT_TIME; // reply time in dut 
   			 uint64_t tag_sync_timeout = 10000; //(10 ms) How much time before the tag stops looking for a response (us)
 static const uint64_t anc_resp_timeout = 10000; //(10 ms) How much time before the anchor stops looking for a response (us)
-static const uint64_t min_tx_timeout = 10000; // (10 ms)min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
-static const uint64_t max_tx_timeout = 20000; // (20 ms). Adjust according to how many tags are active at once
+static const uint64_t min_tx_timeout = 10000; // (10 ms) min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
+static const uint64_t max_tx_timeout = 20000; // (20 ms). Max timeout calue is this + min timeout. Adjust according to how many tags are active at once
 static const uint64_t min_poll_timeout = round_delay_us; // min time to wait before transmitting poll
 static const uint64_t max_poll_timeout = 5000; // 5 ms. Max time in us to wait before attempting to transmit poll
-static const uint64_t responses_timeout = max_poll_timeout+500; // when the tag should stop waiting for responses. Should be smaller than min_tx_timeout, to avoid to simostanously tags. +1 to make sure it can catch late polls
+static const uint64_t responses_timeout = max_poll_timeout + min_poll_timeout + 500; // when the tag should stop waiting for responses. Should be smaller than min_tx_timeout, to avoid to simostanously tags. +1 to make sure it can catch late polls
 			 uint64_t tx_timeout = min_tx_timeout + max_tx_timeout/2; // the initial timeout, before reverting to tag
 			 uint64_t poll_timeout = 0; // The time to wait before attempting to transmit poll
 
@@ -460,7 +460,7 @@ int application_twr_pdoa_tag(void)
 				dwt_setdelayedtrxtime(final_tx_time);
 				int r = dwt_starttx(DWT_START_RX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
-					printf("TX ERR: delayed send time missed");
+					printf("TX ERR: delayed send time missed for final frame\n");
 					state = TWR_ERROR_ANC;
 					continue;
 				}
