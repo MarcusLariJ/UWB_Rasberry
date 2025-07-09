@@ -135,7 +135,7 @@ static const uint64_t round_delay_us = 1000; // reply time (1ms)
 static const uint64_t round_tx_delay = round_delay_us*US_TO_DWT_TIME; // reply time in dut 
   			 uint64_t tag_sync_timeout = 10000; //(10 ms) How much time before the tag stops looking for a response (us)
 static const uint64_t anc_resp_timeout = 10000; //(10 ms) How much time before the anchor stops looking for a response (us)
-static const uint64_t min_tx_timeout = 50000; // (20 ms) min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
+static const uint64_t min_tx_timeout = 30000; // (20 ms) min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
 static const uint64_t max_tx_timeout = 20000; // (20 ms). Max timeout calue is this + min timeout. Adjust according to how many tags are active at once
 static const uint64_t min_poll_timeout = round_delay_us; // min time to wait before transmitting poll
 static const uint64_t max_poll_timeout = 5000; // 5 ms. Max time in us to wait before attempting to transmit poll
@@ -473,6 +473,7 @@ int application_twr_pdoa_tag(void)
 				state = TWR_SYNC_STATE_ANC;
 				// update timeout after afinished exchange - incase the anchor is stuck with a bad high timeout
 				tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
+				last_recieve_time = get_time_us(); // might as well update the receive time afer succesful DS TWR
 			}
 			break;
 		case TWR_ERROR_ANC:
