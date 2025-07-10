@@ -283,8 +283,9 @@ int application_twr_pdoa_tag(void)
 			{
 				rx_done = 0;
 
+				// some printf statements are commented out here, since errors are expected here, when other nodes do DS TWR after this node has finsihed ranging
 				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
-					printf("RX ERR: wrong frame length\n");
+					//printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR_ANC;
 					continue;
 				}
@@ -301,7 +302,7 @@ int application_twr_pdoa_tag(void)
 				rx_frame_pointer = (twr_base_frame_t *)rx_buffer;
 
 				if (rx_frame_pointer->twr_function_code != 0x20) {  /* ranging init */
-					printf("RX ERR: wrong frame (expected sync but got x%02x)\n", rx_frame_pointer->twr_function_code);
+					//printf("RX ERR: wrong frame (expected sync but got x%02x)\n", rx_frame_pointer->twr_function_code);
 					state = TWR_ERROR_ANC;
 					continue;
 				}
