@@ -700,7 +700,7 @@ int application_twr_pdoa_tag(void)
 				printf(print_buffer);
 
 				/* Transmit measurement data */
-				current_rotation = getAngle(); // for debugging
+				//current_rotation = getAngle(); // for debugging. Reanble for PDoA tests
 				pdoa_rx = dwt_readpdoa();
 				dwt_readtdoa(tdoa_rx); // the tdoa measurements are pretty much useless, since antennas are too close. This can be removed
 
