@@ -322,7 +322,8 @@ int application_twr_pdoa_tag(void)
 				poll_frame.sequence_number = next_sequence_number++;
 				dwt_writetxdata(sizeof(poll_frame), (uint8_t *)&poll_frame, 0);
 				dwt_writetxfctrl(sizeof(poll_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
-				
+				// start the reciver again to sense for reception
+				dwt_rxenable(DWT_START_RX_IMMEDIATE);
 			}
 			break;
 		case TWR_WAIT_FOR_CLEAR_STATE_ANC:
@@ -333,6 +334,8 @@ int application_twr_pdoa_tag(void)
 				// Clear! now transmit:
 				/* Send poll frame (2/4) */
 				printf("Airwaves are clear.Preparing to send poll...\n");
+				// Turn off the receiver, or else we wont be able to transmit
+				dwt_forcetrxoff();
 				state = TWR_POLL_RESPONSE_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
 
 				int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
