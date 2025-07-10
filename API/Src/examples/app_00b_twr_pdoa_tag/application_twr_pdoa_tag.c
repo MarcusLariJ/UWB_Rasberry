@@ -133,8 +133,8 @@ enum state_t state = TWR_SYNC_STATE_ANC;
 /* timeout before the ranging exchange will be abandoned and restarted */
 static const uint64_t round_delay_us = 1000; // reply time (1ms)
 static const uint64_t round_tx_delay = round_delay_us*US_TO_DWT_TIME; // reply time in dut 
-  			 uint64_t tag_sync_timeout = 10000; //(10 ms) How much time before the tag stops looking for a response (us)
-static const uint64_t anc_resp_timeout = 10000; //(10 ms) How much time before the anchor stops looking for a response (us)
+  			 uint64_t tag_sync_timeout = round_delay_us+500; //(1.5 ms) How much time before the tag stops looking for a response (us)
+static const uint64_t anc_resp_timeout = round_delay_us+500; //(1.5 ms) How much time before the anchor stops looking for a response (us)
 static const uint64_t min_tx_timeout = 3000000; // (30 ms) min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
 static const uint64_t max_tx_timeout = 20000; // (20 ms). Max timeout calue is this + min timeout. Adjust according to how many tags are active at once
 static const uint64_t min_poll_timeout = round_delay_us + 500; // min time to wait before transmitting poll
@@ -306,14 +306,16 @@ int application_twr_pdoa_tag(void)
 					continue;
 				}
 
-				printf("RX: Sync frame\n");
-
 				state = TWR_WAIT_FOR_CLEAR_STATE_ANC;
 				/*set the random poll response time*/
 				poll_timeout = min_poll_timeout + (rand() % (max_poll_timeout+1));
 				
 				/* Set the expected source to that of the incoming messages source, to ignore all other messages*/
 				memcpy(your_ID, rx_frame_pointer->src_address, 2);
+
+				printf("RX: Sync frame from");
+				print_hex(your_ID, 2);
+
 				/* Initialize the sequence number for this ranging exchange */
 				next_sequence_number = rx_frame_pointer->sequence_number + 1;
 				// set dest and src:
@@ -694,11 +696,6 @@ int application_twr_pdoa_tag(void)
 
 				printf("RX: Final frame\n");
 			
-
-				/* Marker for serial output parsing script*/
-				snprintf(print_buffer, sizeof(print_buffer), "New Frame: poll: %u\n", next_sequence_number);
-				printf(print_buffer);
-
 				/* Transmit measurement data */
 				//current_rotation = getAngle(); // for debugging. Reanble for PDoA tests
 				pdoa_rx = dwt_readpdoa();
@@ -844,12 +841,12 @@ static void rx_err_cb(const dwt_cb_data_t *cb_data)
 int8_t checkTO(uint64_t * last_time, uint64_t timeout){
 		/* check ranging timeout and restart ranging if necessary  */
 		if ((get_time_us() - *last_time) > timeout) { 
-			rx_timestamp_poll = 0; // maybe delete all this
-			tx_timestamp_poll = 0;
-			rx_timestamp_response = 0;
-			tx_timestamp_response = 0;
-			rx_timestamp_final = 0;
-			tx_timestamp_final = 0;
+			//rx_timestamp_poll = 0; // maybe delete all this
+			//tx_timestamp_poll = 0;
+			//rx_timestamp_response = 0;
+			//tx_timestamp_response = 0;
+			//rx_timestamp_final = 0;
+			//tx_timestamp_final = 0;
 			tx_done = 0;
 			rx_done = 0;
 			return 1;
