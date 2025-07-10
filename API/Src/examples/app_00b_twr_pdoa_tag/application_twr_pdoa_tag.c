@@ -493,7 +493,7 @@ int application_twr_pdoa_tag(void)
 			}
 			break;
 		case TWR_ERROR_ANC:
-			printf("Anchor error -> reset\n");
+			//printf("Anchor error -> reset\n");
 			state = TWR_SYNC_STATE_ANC;
 			dwt_rxenable(DWT_START_RX_IMMEDIATE);
 			break;
@@ -763,7 +763,7 @@ int application_twr_pdoa_tag(void)
 			}
 			break;
 		case TWR_ERROR_TAG:
-			printf("Tag error -> reset\n");
+			//printf("Tag error -> reset\n");
 			if (FORCE_TAG){
 				// If forced to be tag, send new sync
 				dwt_forcetrxoff(); // reset, so we can send new message
