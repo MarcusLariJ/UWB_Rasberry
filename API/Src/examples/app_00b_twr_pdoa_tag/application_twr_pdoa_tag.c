@@ -340,6 +340,7 @@ int application_twr_pdoa_tag(void)
 				// Clear! now transmit:
 				/* Send poll frame (2/4) */
 				printf("Airwaves are clear.Preparing to send poll...\n");
+				tx_done = 0; // might seem redundant, but it seems that this flag is somehow high sometimes here (and it shouldnt)
 				// Turn off the receiver, or else we wont be able to transmit
 				dwt_forcetrxoff();
 				state = TWR_POLL_RESPONSE_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
