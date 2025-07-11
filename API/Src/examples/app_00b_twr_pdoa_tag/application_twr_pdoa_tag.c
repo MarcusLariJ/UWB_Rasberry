@@ -331,7 +331,7 @@ int application_twr_pdoa_tag(void)
 			
 			// wait for clear airwaves before attempting to respond:
 			// another timeout can be added here in case the airwaves never become clear, to avoid the node being stauck waiting to tarnsmit 
-			if (rx_done==1){
+			if (!rx_done==0){
 				// We have received a message. Just discard it and restart the receiver
 				printf("Detected channel activity. Waiting...\n");
 				rx_done = 0;
@@ -508,7 +508,9 @@ int application_twr_pdoa_tag(void)
 			memcpy(sync_frame.src_address, my_ID, 2);
 			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
 			dwt_writetxfctrl(sizeof(sync_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
-
+			
+			tx_done = 0; // redundant, but just as a safety precaution
+			rx_done = 0;
 			state = TWR_SYNC_TX_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
 			int r = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 			if (r != DWT_SUCCESS) {
@@ -624,7 +626,7 @@ int application_twr_pdoa_tag(void)
 
 				// Send response after a fixed delay
 				state = TWR_FINAL_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
-
+				tx_done = 0; // redundant, but just as a safety precaution
 				uint32_t resp_tx_time = (rx_timestamp_poll + round_tx_delay) >> 8;
 				dwt_setdelayedtrxtime(resp_tx_time);
 				int r = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
