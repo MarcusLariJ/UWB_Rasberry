@@ -358,6 +358,9 @@ int application_twr_pdoa_tag(void)
 				tx_done = 2;
 				printf("TX: Poll frame\n");
 				last_sync_time = get_time_us();
+				// Moved some SPI calls up here to better meet delay
+				tx_timestamp_poll = get_tx_timestamp_u64();
+				dwt_writetxfctrl(sizeof(final_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 			}
 
 			/* check timeout for response frame*/
@@ -434,8 +437,7 @@ int application_twr_pdoa_tag(void)
 				memcpy(final_frame.dst_address, your_ID, 2);
 				final_frame.sequence_number = next_sequence_number++;
 
-				rx_timestamp_response = get_rx_timestamp_u64();
-				tx_timestamp_poll = get_tx_timestamp_u64();
+				rx_timestamp_response = get_rx_timestamp_u64();				
 
 				// include antenna delay in final timestamp. Remember to remove lower 9 bits, 
 				// since this is what setdelayedtrx does - if this is neglcted, you get some bad noise
@@ -462,14 +464,13 @@ int application_twr_pdoa_tag(void)
 				final_frame.pdoa_tx = pdoa_tx;
 
 				dwt_writetxdata(sizeof(final_frame), (uint8_t *)&final_frame, 0);
-				dwt_writetxfctrl(sizeof(final_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 
 				/* Start transmission at the time we embedded into the message */
 				state = TWR_FINAL_STATE_ANC; /* Set early to ensure tx done interrupt arrives in new state */
 				
 				uint32_t final_tx_time = (rx_timestamp_response + round_tx_delay) >> 8;
 				dwt_setdelayedtrxtime(final_tx_time);
-				int r = dwt_starttx(DWT_START_RX_DELAYED | DWT_RESPONSE_EXPECTED);
+				int r = dwt_starttx(DWT_START_TX_DELAYED | DWT_RESPONSE_EXPECTED);
 				if (r != DWT_SUCCESS) {
 					printf("TX ERR: delayed send time missed for final frame\n");
 					state = TWR_ERROR_ANC;
@@ -526,6 +527,8 @@ int application_twr_pdoa_tag(void)
 				printf("TX: Sync frame\n");
 				last_sync_time = get_time_us();
 				tx_done = 0;
+				// moved some SPI calls up here to better meet delay
+				dwt_writetxfctrl(sizeof(response_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 			}
 			break;
 		case TWR_POLL_RESPONSE_STATE_TAG:
@@ -622,7 +625,6 @@ int application_twr_pdoa_tag(void)
 				memcpy(response_frame.src_address, my_ID, 2);
 				response_frame.sequence_number = next_sequence_number++;
 				dwt_writetxdata(sizeof(response_frame), (uint8_t *)&response_frame, 0);
-				dwt_writetxfctrl(sizeof(response_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 
 				// Send response after a fixed delay
 				state = TWR_FINAL_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
