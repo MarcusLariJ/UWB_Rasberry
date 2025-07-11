@@ -282,7 +282,7 @@ int application_twr_pdoa_tag(void)
 				rx_done = 0;
 
 				// some printf statements are commented out here, since errors are expected here, when other nodes do DS TWR after this node has finsihed ranging
-				if (new_frame_length <= max_frame_length) {
+				if (new_frame_length > max_frame_length) {
 					//printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR_ANC;
 					continue;
@@ -372,7 +372,7 @@ int application_twr_pdoa_tag(void)
 			if (rx_done == 1) {
 				rx_done = 0; /* reset */
 
-				if (new_frame_length <= max_frame_length) {
+				if (new_frame_length > max_frame_length) {
 					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR_ANC;
 					continue;
@@ -562,7 +562,7 @@ int application_twr_pdoa_tag(void)
 				rx_done = 0; /* reset */
 				next_sequence_number = sync_sequence_number; /* reset back to the original seqence number used for sync*/
 
-				if (new_frame_length <= max_frame_length) {
+				if (new_frame_length > max_frame_length) {
 					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR_TAG;
 					continue;
@@ -654,7 +654,7 @@ int application_twr_pdoa_tag(void)
 			if (rx_done == 1) {
 				rx_done = 0; /* reset */
 
-				if (new_frame_length <= max_frame_length) {
+				if (new_frame_length > max_frame_length) {
 					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR_TAG;
 					continue;
