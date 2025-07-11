@@ -135,8 +135,8 @@ static const uint64_t round_delay_us = 1500; // reply time (1ms)
 static const uint64_t round_tx_delay = round_delay_us*US_TO_DWT_TIME; // reply time in dut 
   			 uint64_t tag_sync_timeout = round_delay_us+500; //(1.5 ms) How much time before the tag stops looking for a response (us)
 static const uint64_t anc_resp_timeout = round_delay_us+500; //(1.5 ms) How much time before the anchor stops looking for a response (us)
-static const uint64_t min_tx_timeout = 3000000; // (30 ms) min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
-static const uint64_t max_tx_timeout = 20000; // (20 ms). Max timeout calue is this + min timeout. Adjust according to how many tags are active at once
+static const uint64_t min_tx_timeout = 20000; // (30 ms) min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
+static const uint64_t max_tx_timeout = 3000000; // (20 ms). Max timeout calue is this + min timeout. Adjust according to how many tags are active at once
 static const uint64_t min_poll_timeout = round_delay_us + 500; // min time to wait before transmitting poll
 static const uint64_t max_poll_timeout = 5000; // 5 ms. Max time in us to wait before attempting to transmit poll
 static const uint64_t responses_timeout = max_poll_timeout + min_poll_timeout + 500; // when the tag should stop waiting for responses. Should be smaller than min_tx_timeout, to avoid to simostanously tags. +1 to make sure it can catch late polls
@@ -282,7 +282,7 @@ int application_twr_pdoa_tag(void)
 				rx_done = 0;
 
 				// some printf statements are commented out here, since errors are expected here, when other nodes do DS TWR after this node has finsihed ranging
-				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
+				if (new_frame_length <= max_frame_length) {
 					//printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR_ANC;
 					continue;
@@ -372,7 +372,7 @@ int application_twr_pdoa_tag(void)
 			if (rx_done == 1) {
 				rx_done = 0; /* reset */
 
-				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
+				if (new_frame_length <= max_frame_length) {
 					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR_ANC;
 					continue;
@@ -562,7 +562,7 @@ int application_twr_pdoa_tag(void)
 				rx_done = 0; /* reset */
 				next_sequence_number = sync_sequence_number; /* reset back to the original seqence number used for sync*/
 
-				if (new_frame_length != sizeof(twr_base_frame_t)+2) {
+				if (new_frame_length <= max_frame_length) {
 					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR_TAG;
 					continue;
@@ -654,7 +654,7 @@ int application_twr_pdoa_tag(void)
 			if (rx_done == 1) {
 				rx_done = 0; /* reset */
 
-				if (new_frame_length != sizeof(twr_final_frame_t)+2) {
+				if (new_frame_length <= max_frame_length) {
 					printf("RX ERR: wrong frame length\n");
 					state = TWR_ERROR_TAG;
 					continue;
