@@ -219,7 +219,7 @@ int application_twr_pdoa_tag(void)
     twr_base_frame_t *rx_frame_pointer;
     twr_final_frame_t *rx_final_frame_pointer;
     int16_t sts_quality_index;
-    uint64_t last_sync_time = get_time_us(); // replaced HAL_GetTick();
+    uint64_t last_sync_time = get_time_us(); 
 	last_recieve_time = get_time_us();
 
     float current_rotation = 0;
@@ -265,13 +265,11 @@ int application_twr_pdoa_tag(void)
 				if ((get_time_us() - last_recieve_time) > tx_timeout) {
 					/* If it is time to transmit: */
 					dwt_forcetrxoff();
-					/* Calculate random timeout time, centered around the average*/
-					tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
 					printf("Changing into tag\n");
 					state = TWR_SYNC_STATE_TAG; // We become a tag
-					tx_timestamp_poll = 0;
-					rx_timestamp_response = 0;
-					tx_timestamp_final = 0;
+					//tx_timestamp_poll = 0;
+					//rx_timestamp_response = 0;
+					//tx_timestamp_final = 0;
 					tx_done = 0;
 					rx_done = 0;
 					init_mode = 1;
@@ -333,7 +331,12 @@ int application_twr_pdoa_tag(void)
 			
 			// wait for clear airwaves before attempting to respond:
 			// another timeout can be added here in case the airwaves never become clear, to avoid the node being stauck waiting to tarnsmit 
-			if ((get_time_us() - last_recieve_time) > poll_timeout){
+			if (rx_done==1){
+				// We have received a message. Just discard it and restart the receiver
+				printf("Detected channel activity. Waiting...\n");
+				rx_done = 0;
+				dwt_rxenable(DWT_START_RX_IMMEDIATE);
+			} else if ((get_time_us() - last_recieve_time) > poll_timeout){
 				// Clear! now transmit:
 				/* Send poll frame (2/4) */
 				printf("Airwaves are clear.Preparing to send poll...\n");
@@ -347,12 +350,7 @@ int application_twr_pdoa_tag(void)
 					state = TWR_ERROR_ANC;
 					continue;
 				}
-			} else if (rx_done==1){
-				// We have received a message. Just discard it and restart the receiver
-				printf("Detected channel activity. Waiting...\n");
-				rx_done = 0;
-				dwt_rxenable(DWT_START_RX_IMMEDIATE);
-			}
+			} 
 			break;
 		case TWR_POLL_RESPONSE_STATE_ANC:
 			if (tx_done == 1) {
@@ -540,11 +538,13 @@ int application_twr_pdoa_tag(void)
 						dwt_forcetrxoff();
 						dwt_rxenable(DWT_START_RX_IMMEDIATE);
 						last_recieve_time = get_time_us();
+						/* Calculate random timeout time, centered around the average*/
+						tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
 						printf("No responses left: Changing into anchor\n");
 						state = TWR_SYNC_STATE_ANC;
-						rx_timestamp_poll = 0;
-						tx_timestamp_response = 0;
-						rx_timestamp_final = 0;
+						//rx_timestamp_poll = 0;
+						//tx_timestamp_response = 0;
+						//rx_timestamp_final = 0;
 						tx_done = 0;
 						rx_done = 0;
 						init_mode = 0;
