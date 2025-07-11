@@ -522,6 +522,7 @@ int application_twr_pdoa_tag(void)
 				state = TWR_POLL_RESPONSE_STATE_TAG;
 				printf("TX: Sync frame\n");
 				last_sync_time = get_time_us();
+				tx_done = 0;
 			}
 			break;
 		case TWR_POLL_RESPONSE_STATE_TAG:
@@ -610,7 +611,6 @@ int application_twr_pdoa_tag(void)
 			}
 
 			if (rx_done == 2) {
-				tx_done = 0;
 				rx_done = 0;
 
 				/* Send response frame (3/4) */
