@@ -214,7 +214,6 @@ int application_twr_pdoa_tag(void)
 	/* Activate reception immediately (as we start out as an anchor). */
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-    //uint8_t timestamp_buffer[5];
     uint8_t rx_buffer[max_frame_length];
     twr_base_frame_t *rx_frame_pointer;
     twr_final_frame_t *rx_final_frame_pointer;
@@ -644,6 +643,7 @@ int application_twr_pdoa_tag(void)
 				tx_done = 2;
 				printf("TX: Response frame\n");
 				last_sync_time = get_time_us();
+				tx_timestamp_response = get_tx_timestamp_u64();
 			}
 			
 			/* check timeout for response frame*/
@@ -705,7 +705,7 @@ int application_twr_pdoa_tag(void)
 				/* Transmit measurement data */
 				//current_rotation = getAngle(); // for debugging. Reanble for PDoA tests
 				pdoa_rx = dwt_readpdoa();
-				dwt_readtdoa(tdoa_rx); // the tdoa measurements are pretty much useless, since antennas are too close. This can be removed
+				//dwt_readtdoa(tdoa_rx); // the tdoa measurements are pretty much useless, since antennas are too close. This can be removed
 
 				/* Accept frame continue with ranging */
 				next_sequence_number++;
@@ -715,7 +715,6 @@ int application_twr_pdoa_tag(void)
 			if ((tx_done == 2) && (rx_done == 2)) {
 				rx_final_frame_pointer = (twr_final_frame_t *)rx_buffer;
 
-				tx_timestamp_response = get_tx_timestamp_u64();
 				rx_timestamp_final = get_rx_timestamp_u64();
 
 				// convert to 32 bit
@@ -873,7 +872,7 @@ void transmit_rx_diagnostics(uint64_t ts, uint16_t id, float current_rotation, i
 	float eq_aoa = asinf((pdoa_read_rx*eq_lamb)/(2*M_PI*eq_d)) * (180/M_PI);
 
 	// Readabe tdoa stuff
-	int64_t tdoa_read = ((uint64_t)tdoa[0]) \
+	/*int64_t tdoa_read = ((uint64_t)tdoa[0]) \
 						+ ((uint64_t)tdoa[1] << 8) \
 						+ ((uint64_t)tdoa[2] << 16) \
 						+ ((uint64_t)tdoa[3] << 24) \
@@ -881,7 +880,8 @@ void transmit_rx_diagnostics(uint64_t ts, uint16_t id, float current_rotation, i
 	if (tdoa[5] & 0x01){
 		// negative signed number. Set all upper 24 bits to 1:
 		tdoa_read = tdoa_read | 0xffffff0000000000;
-	}
+	} */
+	int64_t tdoa_read = 0; // too inaccurate, do not use
 
 	snprintf(print_buffer, sizeof(print_buffer), "raw pdoa rx: %.6f, raw pdoa tx: %.6f, tdoa: %ld, aoa: %.6f, True angle: %.1f \n",  pdoa_read_rx, pdoa_read_tx, tdoa_read, eq_aoa, current_rotation);
 	printf(print_buffer);
