@@ -132,7 +132,7 @@ enum state_t {
 enum state_t state = TWR_PRELOAD_SYNC_ANC;
 
 /* timeout before the ranging exchange will be abandoned and restarted */
-static const uint64_t round_delay_us = 1200; // reply time (1ms)
+static const uint64_t round_delay_us = 1000; // reply time (1ms)
 static const uint64_t round_tx_delay = round_delay_us*US_TO_DWT_TIME; // reply time in dut 
   			 uint64_t tag_sync_timeout = round_delay_us+500; //(1.5 ms) How much time before the tag stops looking for a response (us)
 static const uint64_t anc_resp_timeout = round_delay_us+500; //(1.5 ms) How much time before the anchor stops looking for a response (us)
@@ -526,10 +526,10 @@ int application_twr_pdoa_tag(void)
 			if (tx_done == 1) {
 				state = TWR_POLL_RESPONSE_STATE_TAG;
 				printf("TX: Sync frame\n");
-				last_sync_time = get_time_us();
 				tx_done = 0;
 				// moved some SPI calls up here to better meet delay
 				dwt_writetxfctrl(sizeof(response_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
+				last_sync_time = get_time_us();
 			}
 			break;
 		case TWR_POLL_RESPONSE_STATE_TAG:
