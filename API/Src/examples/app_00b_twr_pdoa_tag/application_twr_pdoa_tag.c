@@ -139,8 +139,8 @@ static const uint64_t anc_resp_timeout = round_delay_us+500; //(1.5 ms) How much
 static const uint64_t min_poll_timeout = round_delay_us + 500; // min time to wait before transmitting poll
 static const uint64_t max_poll_timeout = 10000; // 10 ms. Max time in us to wait before attempting to transmit poll. The average time will be max_poll_timeout/2 + min_poll_timeout
 static const uint64_t responses_timeout = max_poll_timeout + min_poll_timeout + 500; // when the tag should stop waiting for responses. Should be smaller than min_tx_timeout, to avoid to simostanously tags. +500 to make sure it can catch late polls
-static const uint64_t min_tx_timeout = responses_timeout+1000; // min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
-static const uint64_t max_tx_timeout = 3000000; // (20 ms). Max timeout calue is this + min timeout. Adjust according to how many tags are active at once
+static const uint64_t min_tx_timeout = responses_timeout+500; // min timout value (us) - the minimum time a node at least has to attempt being an anchor. Should be larger than responses timeout to avoid two tags
+static const uint64_t max_tx_timeout = 10000; // (10 ms). Max timeout calue is this + min timeout. Adjust according to how many tags are active at once
 			 uint64_t tx_timeout = min_tx_timeout + max_tx_timeout/2; // the initial timeout, before reverting to tag
 			 uint64_t poll_timeout = 0; // The time to wait before attempting to transmit poll
 
