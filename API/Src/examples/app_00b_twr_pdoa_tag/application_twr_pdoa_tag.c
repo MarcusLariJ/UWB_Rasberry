@@ -120,6 +120,7 @@ enum state_t {
 	TWR_WAIT_FOR_CLEAR_STATE_ANC,
 	TWR_POLL_RESPONSE_STATE_TAG,
 	TWR_FINAL_STATE_TAG,
+	TWR_PRELOAD_SYNC_ANC,
 	TWR_SYNC_STATE_ANC,
 	TWR_SYNC_TX_STATE_TAG,
 	TWR_POLL_RESPONSE_STATE_ANC,
@@ -128,7 +129,7 @@ enum state_t {
 	TWR_ERROR_ANC,
 };
 
-enum state_t state = TWR_SYNC_STATE_ANC;
+enum state_t state = TWR_PRELOAD_SYNC_ANC;
 
 /* timeout before the ranging exchange will be abandoned and restarted */
 static const uint64_t round_delay_us = 1200; // reply time (1ms)
@@ -211,9 +212,6 @@ int application_twr_pdoa_tag(void)
     /* Install DW IC IRQ handler. */
     port_set_dwic_isr(dwt_isr);
 
-	/* Activate reception immediately (as we start out as an anchor). */
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
-
     uint8_t rx_buffer[max_frame_length];
     twr_base_frame_t *rx_frame_pointer;
     twr_final_frame_t *rx_final_frame_pointer;
@@ -258,23 +256,20 @@ int application_twr_pdoa_tag(void)
 		
 		/*		------------------------------------------------- ANCHOR CODE -------------------------------------------------	 */
 		
+		case TWR_PRELOAD_SYNC_ANC:
+			/*Prepare for transmitting a sync frame, so transmission can happen as soon as possible when changing to initiator*/
+			sync_frame.sequence_number = next_sequence_number++; 
+			/*Remember this sequence number, so we can reset back to it when initiating a ranging with a new anchor from this sync message*/
+			sync_sequence_number = next_sequence_number; 
+			// Set the source. Destination does not matter (Sync initiates ranging with all anchors)
+			memcpy(sync_frame.src_address, my_ID, 2);
+			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
+			dwt_writetxfctrl(sizeof(sync_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
+			/* Activate reception immediately (as we start out as an anchor). */
+    		dwt_rxenable(DWT_START_RX_IMMEDIATE);
+			state = TWR_SYNC_STATE_ANC;
+			break;
 		case TWR_SYNC_STATE_ANC:
-			/* If device is forced to be an anchor only, then never change over to tag */
-			if (!FORCE_ANCHOR){
-				if ((get_time_us() - last_recieve_time) > tx_timeout) {
-					/* If it is time to transmit: */
-					dwt_forcetrxoff();
-					printf("Changing into tag\n");
-					state = TWR_SYNC_STATE_TAG; // We become a tag
-					//tx_timestamp_poll = 0;
-					//rx_timestamp_response = 0;
-					//tx_timestamp_final = 0;
-					tx_done = 0;
-					rx_done = 0;
-					init_mode = 1;
-					continue;
-				}
-			}
 			/* Wait for sync frame (1/4) */
 			if (rx_done)
 			{
@@ -324,6 +319,22 @@ int application_twr_pdoa_tag(void)
 				dwt_writetxfctrl(sizeof(poll_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 				// start the reciver again to sense for reception
 				dwt_rxenable(DWT_START_RX_IMMEDIATE);
+			}
+			/* If device is forced to be an anchor only, then never change over to tag */
+			if (!FORCE_ANCHOR){
+				if ((get_time_us() - last_recieve_time) > tx_timeout) {
+					/* If it is time to transmit: */
+					dwt_forcetrxoff();
+					printf("Changing into tag\n");
+					state = TWR_SYNC_STATE_TAG; // We become a tag
+					//tx_timestamp_poll = 0;
+					//rx_timestamp_response = 0;
+					//tx_timestamp_final = 0;
+					tx_done = 0;
+					rx_done = 0;
+					init_mode = 1;
+					continue;
+				}
 			}
 			break;
 		case TWR_WAIT_FOR_CLEAR_STATE_ANC:
@@ -481,7 +492,7 @@ int application_twr_pdoa_tag(void)
 			if (tx_done == 1) {
 				tx_done = 0;
 				printf("TX: Final frame\n");
-				state = TWR_SYNC_STATE_ANC;
+				state = TWR_PRELOAD_SYNC_ANC;
 				// update timeout after afinished exchange - incase the anchor is stuck with a bad high timeout
 				tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
 				last_recieve_time = get_time_us(); // might as well update the receive time afer succesful DS TWR
@@ -493,22 +504,13 @@ int application_twr_pdoa_tag(void)
 			break;
 		case TWR_ERROR_ANC:
 			//printf("Anchor error -> reset\n");
-			state = TWR_SYNC_STATE_ANC;
-			dwt_rxenable(DWT_START_RX_IMMEDIATE);
+			state = TWR_PRELOAD_SYNC_ANC;
 			break;
 
 		/*		------------------------------------------------- TAG CODE -------------------------------------------------	 */
 
 		case TWR_SYNC_STATE_TAG:
-			/* Send sync frame (1/4) */
-			sync_frame.sequence_number = next_sequence_number++; 
-			/*Remember this sequence number, so we can reset back to it when initiating a ranging with a new anchor from this sync message*/
-			sync_sequence_number = next_sequence_number; 
-			// Set the source. Destination does not matter (Sync initiates ranging with all anchors)
-			memcpy(sync_frame.src_address, my_ID, 2);
-			dwt_writetxdata(sizeof(sync_frame), (uint8_t *)&sync_frame, 0);
-			dwt_writetxfctrl(sizeof(sync_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
-			
+			/* Send sync frame (1/4) */			
 			tx_done = 0; // redundant, but just as a safety precaution
 			rx_done = 0;
 			state = TWR_SYNC_TX_STATE_TAG; /* Set early to ensure tx done interrupt arrives in new state */
@@ -547,7 +549,7 @@ int application_twr_pdoa_tag(void)
 						/* Calculate random timeout time, centered around the average*/
 						tx_timeout = min_tx_timeout + (rand() % (max_tx_timeout+1));
 						printf("No responses left: Changing into anchor\n");
-						state = TWR_SYNC_STATE_ANC;
+						state = TWR_PRELOAD_SYNC_ANC;
 						//rx_timestamp_poll = 0;
 						//tx_timestamp_response = 0;
 						//rx_timestamp_final = 0;
