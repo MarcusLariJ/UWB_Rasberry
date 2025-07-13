@@ -132,7 +132,7 @@ enum state_t {
 enum state_t state = TWR_PRELOAD_SYNC_ANC;
 
 /* timeout before the ranging exchange will be abandoned and restarted */
-static const uint64_t round_delay_us = 900; // reply time (1ms)
+static const uint64_t round_delay_us = 700; // reply time (1ms)
 static const uint64_t round_tx_delay = round_delay_us*US_TO_DWT_TIME; // reply time in dut 
   			 uint64_t tag_sync_timeout = round_delay_us+500; //(1.5 ms) How much time before the tag stops looking for a response (us)
 static const uint64_t anc_resp_timeout = round_delay_us+500; //(1.5 ms) How much time before the anchor stops looking for a response (us)
@@ -321,7 +321,7 @@ int application_twr_pdoa_tag(void)
 				dwt_rxenable(DWT_START_RX_IMMEDIATE);
 			}
 			/* If device is forced to be an anchor only, then never change over to tag */
-			if (!FORCE_ANCHOR){
+			if (!FORCE_ANCHOR && rx_done == 0){
 				if ((get_time_us() - last_recieve_time) > tx_timeout) {
 					/* If it is time to transmit: */
 					dwt_forcetrxoff();
@@ -430,7 +430,7 @@ int application_twr_pdoa_tag(void)
 				printf("RX: Response frame\n");			
 
 				/* get the PDoA of the response frame (AoD)*/
-				pdoa_tx = dwt_readpdoa(); 
+				pdoa_tx = dwt_readpdoa(); // <-- for a faster reply time, maybe retreive this after the final message has been sent and instead embed it in the message exchange between robots
 
 				/* Accept frame and continue ranging */
 				next_sequence_number++;
