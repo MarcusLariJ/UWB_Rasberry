@@ -530,6 +530,8 @@ int application_twr_pdoa_tag(void)
 				// moved some SPI calls up here to better meet delay
 				dwt_writetxfctrl(sizeof(response_frame)+2, 0, 1); /* Zero offset in TX buffer, ranging. */
 				last_sync_time = get_time_us();
+				uint64_t ts = last_sync_time - start_time;
+				csv_write_sync(ts);
 			}
 			break;
 		case TWR_POLL_RESPONSE_STATE_TAG:
@@ -770,6 +772,8 @@ int application_twr_pdoa_tag(void)
 			break;
 		case TWR_ERROR_TAG:
 			//printf("Tag error -> reset\n");
+			uint64_t ts = get_time_us() - start_time;
+			csv_write_fail(ts);
 			if (FORCE_TAG){
 				// If forced to be tag, send new sync
 				dwt_forcetrxoff(); // reset, so we can send new message

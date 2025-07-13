@@ -59,6 +59,10 @@ void csv_write_id(uint64_t ts, uint16_t id);
 
 void csv_write_info(uint16_t id, uint8_t anchor, uint8_t tag);
 
+void csv_write_sync(uint64_t ts);
+
+void csv_write_fail(uint64_t ts);
+
 #ifdef __cplusplus
 }
 #endif

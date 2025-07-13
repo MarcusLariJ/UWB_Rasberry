@@ -142,6 +142,20 @@ inline void csv_write_info(uint16_t id, uint8_t anchor, uint8_t tag){
     fflush(logfile);
 }
 
+inline void csv_write_sync(uint64_t ts){
+    // type 6: timestamp when a sync has been sent. Can be used to monitor efficency of CSMA/CA
+    fprintf(logfile, "6, %lu", ts);
+    fputc('\n', logfile);
+    fflush(logfile);
+}
+
+inline void csv_write_fail(uint64_t ts){
+    // Type 7: Timestamp when a failure has occured, due to collision
+    fprintf(logfile, "7, %lu", ts);
+    fputc('\n', logfile);
+    fflush(logfile);
+}
+
 inline void csv_write_CIR(const uint8_t *data, uint16_t length, uint16_t offset){
     // type 2: CIR data
     fprintf(logfile, "2");
