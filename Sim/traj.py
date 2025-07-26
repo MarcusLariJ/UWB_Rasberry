@@ -208,51 +208,57 @@ def gen_noise(y: np.ndarray, bias: np.ndarray = None, sigma: np.ndarray = None, 
 
 ### Funcations for generating fake angles:
 
-def pdoa2ang(a):
+def pdoa2ang(x):
     # Function for converting pdoa to angle - including all the possible ambiguities
     
-    d = 0.026 # 0.0231      # Distance between antennas
-    f = 6.4896e9    # frequency
-    c = 299792458   # speed of light
-    lam = c/f       # wavelength
+    a = 0.36293265
+    b = -0.17953738
 
     # The two thresholds
-    rupp = -(2*np.pi*d)/lam + 2*np.pi
-    rlow = (2*np.pi*d)/lam - 2*np.pi
+    rupp = (-np.pi/2)/a + 2*np.pi
+    rlow = (np.pi/2)/a - 2*np.pi
 
-    ang1 = np.arcsin((a*lam)/(2*np.pi*d))
+    ang1 = a*(x)
     
-    if a >= rupp:
-        ang2 = np.arcsin(((a-2*np.pi)*lam)/(2*np.pi*d))
-    elif a <= rlow:
-        ang2 = np.arcsin(((a+2*np.pi)*lam)/(2*np.pi*d))
+    if x >= rupp:
+        ang2 = a*(x-2*np.pi)
+    elif x <= rlow:
+        ang2 = a*(x+2*np.pi)
     else:
         # Simple case of only two ambiguities:
         mang = np.zeros(2)
-        mang[0] = ang1
-        mang[1] = mf.normalize_angle(np.pi - ang1)
+        mang[0] = mf.normalize_angle(ang1 + b)
+        mang[1] = mf.normalize_angle(np.pi - ang1 + b)
 
         return mang
     # More advanced case of four ambiguities:
 
     mang = np.zeros(4)
-    mang[0] = ang1
-    mang[1] = ang2
-    mang[2] = mf.normalize_angle(np.pi - ang1)
-    mang[3] = mf.normalize_angle(np.pi - ang2)
+    mang[0] = mf.normalize_angle(ang1 + b)
+    mang[1] = mf.normalize_angle(ang2 + b)
+    mang[2] = mf.normalize_angle(np.pi - ang1 + b)
+    mang[3] = mf.normalize_angle(np.pi - ang2 + b)
 
     return mang
 
-def gen_adv_amb(a):
+def gen_adv_amb(ang):
     """
     More detailed model of ambivalent measurements that includes upp to four ambiguities
     """
-    d = 0.026 # 0.0231      # Distance between antennas
-    f = 6.4896e9    # frequency
-    c = 299792458   # speed of light
-    lam = c/f       # wavelength
+    a = 0.36293265
+    b = -0.17953738
     
-    pdoa = mf.normalize_angle(np.sin(a)*(2*np.pi*d)/(lam)) # First generate the equivalent pdoa
+    # First generate the equivalent pdoa
+    if (ang < -np.pi/2 + b):
+        # lower region
+        pdoa = mf.normalize_angle((ang-b + np.pi)/-a)
+    elif (ang > np.pi/2 + b):
+        # Upper region
+        pdoa = mf.normalize_angle((ang-b - np.pi)/-a)
+    else:
+        # Middle region
+        pdoa = mf.normalize_angle((ang-b)/a)
+    
     mang = pdoa2ang(pdoa) # Then all the ambiguities
     return mang # Return up to four ambiguities
 

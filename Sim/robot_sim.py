@@ -32,10 +32,10 @@ class Anchor:
     def t(self) -> np.ndarray:
         return self.meas.t
     
-    def draw_position(self, ax, color = 'b'):
+    def draw_position(self, ax, color = 'b', arrow=True):
         # Qucikly plot the position (without covariance matrix)
         temp = np.concatenate((self.x[mf.X_THETA:mf.X_THETA+1,:], self.x[mf.X_P,:]), axis=0)
-        rp.plot_position(ax, temp, color=color, draw_arrow=False, marker='x')
+        rp.plot_position(ax, temp, color=color, draw_arrow=arrow, marker='x')
 
 class Robot_single:
     def __init__(self, x0: np.ndarray,
@@ -199,6 +199,8 @@ class robot_luft(Robot_single):
             self.mot.propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
             if imu_correct:
                 nis, _= mf.KF_IMU_rom(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
+            else:
+                nis = 1 # just some random value to avoid errrors
             self.p_i += 1 
         else:
             print("End of trajectory!!")

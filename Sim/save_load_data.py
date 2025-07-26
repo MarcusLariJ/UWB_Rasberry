@@ -14,7 +14,8 @@ class RobotData():
                  pos: np.ndarray,
                  biases: np.ndarray, 
                  ids: np.ndarray, 
-                 rb_ids: np.ndarray):
+                 rb_ids: np.ndarray,
+                 anchors: list):
         self.x_log = x_log # state logged by robot
         self.P_log = P_log # covariance logged by robot
         self.IMU_nis_log = IMU_nis_log # IMU NIS logged by robot
@@ -23,6 +24,7 @@ class RobotData():
         self.biases = biases # the constant bias applied during this run
         self.ids = ids
         self.rb_ids = rb_ids
+        self.anchors = anchors # The different anchors used for the siumlation
 
 def save_data(obj: RobotData, filename):
     folder = "dataSim"

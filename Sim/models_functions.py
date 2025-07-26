@@ -80,7 +80,7 @@ class MeasModel:
     """
     def __init__(self, 
                  t: np.ndarray = np.array([[0],[0]]), 
-                 R: np.ndarray = np.diag([0.0009, 0.001, 0.0002, 0.004, 0.004])):
+                 R: np.ndarray = np.diag([0.011, 0.0008, 0.0002, 0.012, 0.012])):
         """"
         Inits the measurement model
         Args:
@@ -402,7 +402,7 @@ class MotionModel:
     def __init__(self, dt: float = 1.0,  
                 x0: np.ndarray = np.zeros((STATE_LEN, 1)),
                 P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
-                Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 0.000001, 0.00001, 0.00001])):
+                Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 1e-7, 1e-6, 1e-6])):
         """"
         Inits the measurement model
         Args:

@@ -202,9 +202,10 @@ def plot_ANIS(ax: plt.Axes,
     r1_line = np.ones_like(anis)*r1
     r2_line = np.ones_like(anis)*r2
     # Plot anees
-    ax.semilogy(t, anis, color=color, label=label)
-    ax.semilogy(t, r1_line, color=thres_c, linestyle='--')
-    ax.semilogy(t, r2_line, color=thres_c, linestyle='--')
+    ax.scatter(t, anis, color=color, label=label, s=5)
+    ax.plot(t, r1_line, color=thres_c, linestyle='--')
+    ax.plot(t, r2_line, color=thres_c, linestyle='--')
+    ax.set_yscale('log')
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("ANIS")
     ax.grid()

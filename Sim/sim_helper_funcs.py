@@ -9,16 +9,16 @@ def anc_setup1():
     """
         Anchors in each corner of the arena
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[1],[69]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[0],[0],[99],[1]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[-np.pi/4],[0],[1],[69]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[3*np.pi/4],[0],[99],[1]])
     return xanc1, xanc2
 
 def anc_setup2():
     """
         Anchor in the other corners of the arena
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[1],[1]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[0],[0],[99],[69]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[np.pi/4],[0],[1],[1]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[-3*np.pi/4],[0],[99],[69]])
     return xanc1, xanc2
 
 def anc_setup3():
@@ -36,6 +36,13 @@ def anc_setup4():
     xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[45],[35]])
     xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[0],[0],[55],[35]])
     return xanc1, xanc2
+
+def anc_setup5():
+    """
+        Anchor in the middle
+    """
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[50],[35]])
+    return xanc1
 
 ########### different trajectories pre-defined ##############
 
@@ -255,13 +262,10 @@ def updateAllLuft(robots: list,
                    params: list,
                    i_indx: int,
                    dt: int,
-                   update_freq: float,
-                   exch_time: float):
+                   delay: float):
     """
         Perform a measurements to all other robots.
         Each indivudal robot have a delay between measurements of exc_time
-        Each robot attempts to start a measurement chain at the frequency given by update_freq.
-        The robots have an offset in when they start a measurement chain, so they are evenly spaced out
         # Params have the shape:
         [[sr=0, sb=0, thres_anc=0, thres_rob=0, max_dist=-1, amb=True, meas2_anc=false, meas2_rob=False, pout_r, pout_b],
         ...,
@@ -272,43 +276,49 @@ def updateAllLuft(robots: list,
     if i_indx == 0:
         updateAllLuft.j = 0
         updateAllLuft.robi = 0
-        updateAllLuft.next_time = 0
 
-    freq_time = round(update_freq/dt)
+    delay_idx = round(delay/dt)
     N = len(robots)
-    offset = math.floor(freq_time/N)
+    start_j = updateAllLuft.j
+    start_rob = updateAllLuft.robi 
+    chk = None
 
-    for i in range(N):
-        # Update which robot should be updating:
-        if (i_indx + offset*i) % freq_time == 0:
-            updateAllLuft.robi = i
-            updateAllLuft.j = 0
-            updateAllLuft.next_time = 0
-
-    # Now handle the updating for the specific robot:
-    if updateAllLuft.j < len(update_list[updateAllLuft.robi]):
-        if i_indx >= updateAllLuft.next_time:
-            # Make measurements:
+    # if it is time to perform an update
+    if (i_indx % delay_idx == 0):
+        # First skip all invalid entries in the update list
+        while (1):
             j = updateAllLuft.j
             i = updateAllLuft.robi
-            while (update_list[i][j] is None) or (robots[i] == update_list[i][j]):
-                # This is to clear out disabled measurements (fx an anchor is set to None, to simulate it being disabled)
-                # And to ignore if the robot tries to conduct a measurement with itself
-                updateAllLuft.j += 1
-                j = updateAllLuft.j
-                if j >= len(update_list[updateAllLuft.robi]):
-                    # Safety check, in case the last robot is None/self
-                    return
-            if isinstance(update_list[i][j], rsim.Anchor):
-                robots[i].anchor_meas(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][4], params[i][5], params[i][6], params[i][8], params[i][9])
-            elif isinstance(update_list[i][j], rsim.robot_luft):
-                robots[i].robot_meas(update_list[i][j], params[i][0], params[i][1], params[i][3], params[i][4], params[i][5], params[i][7], params[i][8], params[i][9])
-            # Update timings
-            updateAllLuft.next_time = round(i_indx + exch_time/dt)
+            # check if entry is none or is the robot itself
+            if (update_list[i][j] is not None) and (robots[i] != update_list[i][j]):
+                # if the robot is valid, then make the measurement
+                if isinstance(update_list[i][j], rsim.Anchor):
+                    chk = robots[i].anchor_meas(update_list[i][j], params[i][0], params[i][1], params[i][2], params[i][4], params[i][5], params[i][6], params[i][8], params[i][9])
+                elif isinstance(update_list[i][j], rsim.robot_luft):
+                    chk = robots[i].robot_meas(update_list[i][j], params[i][0], params[i][1], params[i][3], params[i][4], params[i][5], params[i][7], params[i][8], params[i][9])
+                # These functions return none, if the robots are out of range 
+
+            # Move on to next entry in update list and possibly the next robot
             updateAllLuft.j += 1
-    return
+            if updateAllLuft.j >= len(update_list[updateAllLuft.robi]):
+                # Measurements to all the robots in the update list have been made - move on to next robot
+                updateAllLuft.j = 0
+                updateAllLuft.robi += 1
+                if updateAllLuft.robi == N:
+                    # loop around
+                    updateAllLuft.robi = 0
+            
+            # A valid measurement has been made - break out of the loop
+            if (chk is not None):
+                break
 
-
+            # Security check: If no robots are able to make a measurement, break the loop
+            if (updateAllLuft.j == start_j and updateAllLuft.robi == start_rob):
+                break
+        
+    # Return the NIS value
+    return chk
+        
 
 def updateAllSimple(robot: rsim.Robot_single, 
                    anchor: list, rob_other: list,
