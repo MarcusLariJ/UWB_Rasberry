@@ -64,7 +64,7 @@ class Robot_single:
         self.P_log = np.zeros((mf.STATE_LEN, mf.STATE_LEN, self.p_len)) # keeps a record of all covariances
         self.P_log[:,:,0] = P
         self.dt = dt
-        self.nis_IMU = np.zeros(self.p_len) # Keeps all recoreded IMU NIS values
+        #self.nis_IMU = np.zeros(self.p_len) # Keeps all recoreded IMU NIS values
         self.nis_rb = np.zeros(self.p_len) # Keeps all recorded RB NIS
         self.rb_ids = np.zeros(self.p_len) # Keeps track of the robot/anchors we communicated with
 
@@ -87,28 +87,25 @@ class Robot_single:
     def t(self) -> np.ndarray:
         return self.meas.t
 
-    def predict(self, imu_correct = True, thres=0):
+    def predict(self):
         """
         Predict one timestep
         """
-        nis = 0
         if self.p_i < self.p_len-1:
-            self.mot.predict()
-            self.mot.propagate()
+            x0 = self.imu[:,self.p_i:self.p_i+1]
+            u0 = self.imu[:,self.p_i]
+            self.mot.predict(x0, u0)
+            self.mot.propagate(x0, u0)
             self.p_i += 1 
-            if imu_correct:
-                nis, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], thres=thres)
 
         else:
             print("End of trajectory!!")
-            return nis
 
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
-        self.nis_IMU[self.p_i - 1] = nis # -1, because it was due to IMU meas at that point
 
-        return nis
+        return 
 
     def draw_position(self, ax, color = 'b'):
         # Qucikly plot the position
@@ -195,23 +192,20 @@ class robot_luft(Robot_single):
         Predict one timestep
         """
         if self.p_i < self.p_len-1:
-            self.mot.predict()
-            self.mot.propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
+            x0 = self.imu[:,self.p_i:self.p_i+1]
+            u0 = self.imu[:,self.p_i]
+            self.mot.predict(x0, u0)
+            self.mot.propagate_rom(x0, u0, self.s_list, self.id_num) #<--- notice rom function here
             self.p_i += 1 
-            if imu_correct:
-                nis, _= mf.KF_IMU_rom(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
-            else:
-                nis = 1 # just some random value to avoid errrors
+
         else:
             print("End of trajectory!!")
-            return nis
 
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
-        self.nis_IMU[self.p_i - 1] = nis # -1, because it was due to IMU meas at that point
 
-        return nis
+        return
     
     def anchor_meas(self, a: Anchor, sr=0, sb=0, thres=0, max_dist=-1, amb=True, meas2=False, pout_r=0, pout_b=0):
         """
@@ -351,58 +345,6 @@ class robot_luft(Robot_single):
         idi = self.id
         ti = self.t
         return xi, Pii, sigmaij, idi, ti
-
-
-class robot_luft_multi(Robot_single):
-    def __init__(self, x0: np.ndarray,
-                 path: np.ndarray, 
-                 imu: np.ndarray,
-                 id: int,
-                 dt: float = 1.0,
-                 P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
-                 Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 0.000001, 0.00001, 0.00001]),
-                 R: np.ndarray = np.diag([0.0009, 0.001, 0.0002, 0.004, 0.004]),
-                 t: np.ndarray = np.array([[0],[0]]),
-                 hyp_max: int = 4
-                 ):
-        """"
-        Inits the robot model, used for lufts implementation of collaborative localization
-        Args:
-            path (np.ndarray): trajectory to follow
-            imu (np.ndarray): imu measurements of path
-        """
-        super().__init__(x0=x0, path=path, imu=imu, dt=dt, P=P, Q=Q, R=R, t=t, id=id)
-        # Setup list of robots we have met
-        self.id_len = 10 # Allocate memory for 10 robots
-        self.id_num = 0 # current length of dictionary
-        self.id_list = {}
-        self.s_list = np.zeros((mf.STATE_LEN, mf.STATE_LEN, hyp_max, self.id_len)) # list for interrobot correleations (sigmaij)
-
-        # Overwrite motion models, so they contain all the possible hypotheses
-        self.mot = [mf.MotionModel(x0 = x0, dt=dt, P=P, Q=Q)]*hyp_max
-    
-    def predict(self, imu_correct=True, thres=0):
-        """
-        Predict one timestep
-        """
-        if self.p_i < self.p_len-1:
-            for i in range(self.hyp_max):
-                self.mot[i].predict()
-                self.mot[i].propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
-                self.p_i += 1
-                if imu_correct:
-                    nis, _= mf.KF_IMU_rom(self.mot[i], self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
-        else:
-            print("End of trajectory!!")
-            return nis
-
-        # Log updated quantities:        
-        self.x_log[:,self.p_i:self.p_i+1] = self.x #<-- change this so the most likely x is returned
-        self.P_log[:,:,self.p_i] = self.P
-        self.nis_IMU[self.p_i - 1] = nis # -1, because it was due to IMU meas at that point
-
-        return nis
-
 
 ########### Error functions ###############
 

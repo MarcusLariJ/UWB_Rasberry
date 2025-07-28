@@ -1,5 +1,4 @@
 # %%
-import robot_plotter as rp
 import models_functions as mf
 import traj
 import numpy as np
@@ -23,7 +22,7 @@ y_IMU_base = []
 x0 = []
 
 end_idx = None # can be modified for shorter trajectories
-#end_idx = round(100/dt)
+end_idx = round(100/dt)
 
 for path in paths:
     p, imu, x = path(dt)
@@ -160,7 +159,7 @@ def main():
             rob = res['robots'][i]
             x_log[i,:,:,j] = rob.x_log
             P_log[i,:,:,:,j] = rob.P_log
-            nis_imu_log[i,:,j] = rob.nis_IMU
+            #nis_imu_log[i,:,j] = rob.nis_IMU
             nis_rb_log[i,:,j] = rob.nis_rb
             rb_ids[i,:,j] = rob.rb_ids
             biases[i,:,j] = res['biases'][i].squeeze()
@@ -170,7 +169,7 @@ def main():
 
 
     # finally save to an pickle object:
-    robotData = sldat.RobotData(x_log, P_log, nis_imu_log, nis_rb_log, ref_pos, biases, self_ids, rb_ids, anchors)
+    robotData = sldat.RobotData(x_log, P_log, 0, nis_rb_log, ref_pos, biases, self_ids, rb_ids, anchors)
     sldat.save_data(robotData, 'imu_test', folder=r"D:\msc_data")
     # no_collab_4anc_0d_meas1_noThres_noAmb
     # Play sound 

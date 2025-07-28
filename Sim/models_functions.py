@@ -7,23 +7,21 @@ import numpy as np
 RM = lambda theta: np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
 RMdot = lambda theta: np.array([[-np.sin(theta),-np.cos(theta)],[np.cos(theta),-np.sin(theta)]])
 
-STATE_LEN = 11
-MEAS_LEN = 5
-IMU_LEN = 3
+STATE_LEN = 8
+MEAS_LEN = 2
 RB_LEN = 2
 RB2_LEN = 3
-INPUT_LEN = 6
+INPUT_LEN = 3
+NOISE_LEN = 6
 
 # Enums for state space:
 X_THETA = 0
-X_W = 1
-X_P = slice(2,4)
-X_V = slice(4,6)
-X_A = slice(6,8)
-X_BW = 8
-X_BA = slice(9,11)
+X_P = slice(1,3)
+X_V = slice(3,5)
+X_BW = 6
+X_BA = slice(7,8)
 X_THETA_EXT = X_THETA+STATE_LEN
-X_P_EXT = slice(2+STATE_LEN, 4+STATE_LEN)
+X_P_EXT = slice(1+STATE_LEN, 3+STATE_LEN)
 
 # Enums for measurement space:
 Z_PHI = 0
@@ -34,10 +32,14 @@ Z_W = 2
 Z_A = slice(3,5)
 
 # ENUMS for input space:
-U_ETAW = 0
-U_ETAA = slice(1,3)
-U_ETABW = 3
-U_ETABA = slice(4,6)
+U_W = 0
+U_A = slice(1,3)
+
+# Noise input
+NU_W = 0
+NU_A = slice(1,3)
+NU_BW = 3
+NU_BA = slice(4,6)
 
 #### Helper functions ####
 
@@ -80,7 +82,7 @@ class MeasModel:
     """
     def __init__(self, 
                  t: np.ndarray = np.array([[0],[0]]), 
-                 R: np.ndarray = np.diag([0.011, 0.0008, 0.0002, 0.012, 0.012])):
+                 R: np.ndarray = np.diag([0.011, 0.0008])):
         """"
         Inits the measurement model
         Args:
@@ -120,27 +122,6 @@ class MeasModel:
         """
         return self._radian_sel
 
-    def h_bearing(self, xi: np.ndarray, xj: np.ndarray, tj: np.ndarray) -> np.ndarray:
-        """
-        Computes the bearing prediction only
-
-        Args:
-            xi (np.ndarray): The information of the state of the ego robot at time 'k'
-            xj (np.ndarray): The information of the state at the measured robot j at time 'k'
-            
-        Returns:
-            float: the bearing of state xi, xj 
-        """
-        # Precompute q
-        thetaj = xj[X_THETA][0]
-        thetai = xi[X_THETA][0]
-        q = (xj[X_P] + RM(thetaj) @ tj - xi[X_P] - RM(thetai) @ self._t)
-        
-        phi = np.arctan2(q[1], q[0]) - xi[X_THETA]
-        
-        # ONly return the part that corresponds to bearing
-        return phi
-    
     def h_rb(self, xi: np.ndarray, xj: np.ndarray, tj: np.ndarray) -> np.ndarray:
         """ 
         Computes the masurement update when we have access to measurement with other robot
@@ -185,56 +166,6 @@ class MeasModel:
         z[Z_R2] = np.sqrt(np.transpose(q) @ q)
 
         return z
-
-    def h_IMU(self, xi: np.ndarray) -> np.ndarray:
-        """
-        Computes the simple mesurement update, where we only have access to propertiary sensors
-
-        Args:
-            xi (np.ndarray): The information of the state of the ego robot at time 'k'
-            
-        Returns:
-            (np.ndarray): The measurement of state xi, xj 
-        """
-        self._z[Z_W] = xi[X_W] + xi[X_BW]
-        self._z[Z_A] = RM(-xi[X_THETA][0]) @ xi[X_A] + xi[X_BA]
-        
-        # ONly return the part that corresponds to IMU measurement
-        return self._z[Z_W:]
-
-    def h_full(self, xi: np.ndarray, xj: np.ndarray, tj: np.ndarray) -> np.ndarray:
-        """ 
-        Computes the masurement update when we have access to both propertiary sensors and measurement with other robot
-
-        Args:
-            xi (np.ndarray): The information of the state of the ego robot i at time 'k'
-            xj (np.ndarray): The information of the state at the measured robot j at time 'k'
-            
-        Returns:
-            (np.ndarray): The measurement of state xi, xj 
-        """        
-        # RB measurement:
-        self.h_rb(xi, xj, tj)
-        # The IMU measurement:
-        self.h_IMU(xi)
-
-        return self._z
-
-    def get_jacobian_bearing(self, xi0: np.ndarray, xj0: np.ndarray, tj: np.ndarray) -> np.ndarray:
-        
-        H = np.zeros((1, STATE_LEN))
-
-        ti = self._t
-        thetai = xi0[X_THETA][0]
-        thetaj = xj0[X_THETA][0]
-        # Precompute q
-        q = (xj0[X_P] + RM(thetaj) @ tj - xi0[X_P] - RM(thetai) @ ti)
-
-        H[0, X_THETA] = (RMdot(thetai)[0,:] @ ti * q[1] - RMdot(thetai)[1,:] @ ti * q[0])/(np.transpose(q) @ q) - 1
-        H[0, X_P] = np.array([q[1], -q[0]]).reshape(1,-1) / (np.transpose(q) @ q)
-        
-        return H
-
 
     def get_jacobian_rb(self, xi0: np.ndarray, xj0: np.ndarray, tj: np.ndarray) -> np.ndarray:
         """
@@ -357,53 +288,14 @@ class MeasModel:
 
         return Hij2
 
-    def get_jacobian_IMU(self, x0: np.ndarray) -> np.ndarray:
-        """
-        Computes the jacobian at time k for the IMU measurement
-
-        Args:
-            x0 (np.ndarray): The point to evaluate the jacobian at
-        
-        Returns:
-            (np.ndarray): The Jacobian matrix evaluated at x0
-        """
-        thetai = x0[X_THETA][0]
-        self._H[Z_W, X_W] = 1; self._H[Z_W, X_BW] = 1
-        #self._H[Z_A, X_THETA:X_THETA+1] = -RMdot(-thetai) @ x0[X_A]; 
-        self._H[Z_A, X_A] = RM(-thetai); self._H[Z_A, X_BA] = np.eye(2) 
-
-        # Return only partial H, corresponding to IMU measurements:
-        return self._H[Z_W:,:]
-
-    def get_jacobian_full(self, xi0: np.ndarray, xj0: np.ndarray, tj: np.ndarray) -> np.ndarray:
-        """
-        Computes the jacobian at time k for the measurement
-
-        Args:
-            xi0 (np.ndarray): The stationary point for the ego bot
-            xj0 (np.ndarray): The stationary point for the measurement bot
-            tj: (np.ndarray): The offset of the measurement bot
-
-        Returns:
-            (np.ndarray): The Jacobian matrix evaluated at xi0, xj0
-        """
-        ti = self._t
-        thetai = xi0[X_THETA][0]
-        thetaj = xj0[X_THETA][0]
-        # Compute the Jacobian for IMU measurement:
-        self.get_jacobian_IMU(xi0)
-        # Compute the Jacobian for range/angle measurement:
-        self.get_jacobian_rb(xi0, xj0, tj)
-
-        return self._H
 
 class MotionModel:
     """ Base measurement model class
     """
     def __init__(self, dt: float = 1.0,  
                 x0: np.ndarray = np.zeros((STATE_LEN, 1)),
-                P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
-                Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 1e-7, 1e-6, 1e-6])):
+                P: np.ndarray = np.diag([0.3, 3.0, 3.0, 0.1, 0.1, 0.0001, 0.1, 0.1]),
+                Q: np.ndarray = np.diag([0.0002, 0.012, 0.012, 1e-7, 1e-6, 1e-6])):
         """"
         Inits the measurement model
         Args:
@@ -411,30 +303,15 @@ class MotionModel:
             P (np.ndarray): State covariance
             Q (np.ndarray): Process noise covariance
         """
-        # Initial uncertainty:
-        # +-90 on orientation
-        # +-8 degrees pr second
-        # +- 5 m uncertainty on position
-        # +- 1 m/s on velocity
-        # +- 0.6 m/s^2 on acceleration
-        # +- 1.7 deg/s on rate bias 
-        # +- 0.95 m/s^2 on acc bias 
         self._P = P
         self._Q = Q
         self._dt = dt
         A = np.eye(STATE_LEN)
         B = np.zeros((STATE_LEN, INPUT_LEN))
-
-        A[X_THETA, X_W] = dt
-        A[X_P, X_V] = dt*np.eye(2); A[X_P, X_A] = 0.5*np.eye(2)*(dt**2)
-        A[X_V, X_A] = dt*np.eye(2) 
+        Bw = np.zeros((STATE_LEN, NOISE_LEN))
         self._A = A
-
-        B[X_W, U_ETAW] = 1
-        B[X_A, U_ETAA] = np.eye(2)
-        B[X_BW, U_ETABW] = 1
-        B[X_BA, U_ETABA] = np.eye(2)
         self._B = B
+        self.Bw = Bw
 
         self._x = x0
         self._radian_sel = np.array([X_THETA])
@@ -486,32 +363,72 @@ class MotionModel:
     def B(self) -> np.ndarray:
         return self._B
 
-    def predict(self) -> np.ndarray:
+    def f_pred(self, x0: np.ndarray, u0: np.ndarray, dt):
+        """
+        Prediction function
+        """
+        theta = x0[X_THETA][0]
+        xpred = np.zeros((STATE_LEN, 1))
+
+        xpred[X_THETA] = x0[X_THETA] + (u0[U_W] - x0[X_BW])*dt
+        xpred[X_P] = x0[X_P] + RM(theta)(u0[U_A] - x0[X_BA])*dt**2 + x0[X_P]*dt
+        xpred[X_V] = x0[X_V] + RM(theta)(u0[U_A] - x0[X_BA])*dt
+        xpred[X_BW] = x0[X_BW]
+        xpred[X_BA] = x0[X_BA]
+
+        return xpred
+
+    def get_A_B(self, x0: np.ndarray, u0: np.ndarray, dt):
+        """
+        Calculate A and B matrix
+        """
+        self.A = np.eye(STATE_LEN)
+        theta = x0[X_THETA][0]
+        self.A(X_THETA, X_BW) = -dt
+        self.A(X_P, X_THETA) = RMdot(x0[theta])*(u0[U_A]-x0[X_BA])*dt**2; self.A[X_P, X_V] = np.eye(2)*dt; self.A[X_P, X_BA] = -RM(theta)*dt**2
+        self.A(X_V, X_THETA) = RMdot(x0[theta])*(u0[U_A]-x0[X_BA])*dt; self.A[X_V, X_BA] = -RM(theta)*dt
+
+        self.B = np.zeros((STATE_LEN, INPUT_LEN))
+        self.B[X_THETA, U_W] = dt
+        self.B[X_P, U_A] = RM(theta)*dt**2
+        self.B[X_V, U_A] = RM(theta)*dt
+
+        self.Bw = np.zeros((STATE_LEN, NOISE_LEN))
+        self.Bw[X_THETA, NU_W] = dt
+        self.Bw[X_P, NU_A] = RM(theta)*dt**2
+        self.Bw[X_V, NU_A] = RM(theta)*dt
+        self.Bw[X_BA, NU_BW] = dt
+        self.Bw[X_BW, NU_BW] = dt
+
+        return self.A, self.B, self.Bw
+
+    def predict(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
         """
         Predict next state
         """
-        xnew = self._A @ self._x # This motion model assumes zero mean on the inputs
+        xnew = self.f_pred(x, u)
         self._x = xnew
         return xnew
     
-    def propagate(self) -> np.ndarray:
+    def propagate(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
         """
         Propagate process noise
         Returns:
             Updated state covariance
         """
-        Pnew = self._A @ self._P @ np.transpose(self._A) + self._B @ self._Q @ np.transpose(self._B)*self._dt
+        self.get_A_B(x, u)
+        Pnew = self.A @ self._P @ self.A.T + self.Bw @ self._Q @ self.Bw.T
         self._P = Pnew
         return Pnew
 
-    def propagate_rom(self, cor: np.ndarray, cor_N: int):
+    def propagate_rom(self, x: np.ndarray, u: np.ndarray, cor: np.ndarray, cor_N: int):
         """
         Runs the normal propagate step and updates every correlation using Rom's method
         Args:
             cor (np.ndarray): list of inter-robot correlations
             cor_N (np.ndarray): number of inter-robot correlations
         """
-        Pnew = self.propagate()
+        Pnew = self.propagate(x, u)
         for i in range(cor_N):
             cor[:,:,i] = self._A @ cor[:,:,i]
         return Pnew
