@@ -8,3 +8,7 @@ API/log.csv
 Sim/dataSim/test.pickle
 *.pickle
 *.gz
+*.csv
+*.txt
+Data/imu.xlsx
+*.pdf

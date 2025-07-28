@@ -26,8 +26,7 @@ class RobotData():
         self.rb_ids = rb_ids
         self.anchors = anchors # The different anchors used for the siumlation
 
-def save_data(obj: RobotData, filename):
-    folder = "dataSim"
+def save_data(obj: RobotData, filename, folder = "dataSim"):
     os.makedirs(folder, exist_ok=True)  # Create the folder if it doesn't exist
     filepath = os.path.join(folder, filename + ".pkl.gz")
     
@@ -37,8 +36,7 @@ def save_data(obj: RobotData, filename):
     except Exception as ex:
         print("Error during pickling object (Possibly unsupported):", ex)
 
-def load_object(filename) -> RobotData:
-    folder = "dataSim"
+def load_object(filename, folder = "dataSim") -> RobotData:
     filepath = os.path.join(folder, filename + ".pkl.gz")
 
     try:

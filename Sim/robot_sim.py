@@ -95,10 +95,10 @@ class Robot_single:
         if self.p_i < self.p_len-1:
             self.mot.predict()
             self.mot.propagate()
+            self.p_i += 1 
             if imu_correct:
                 nis, _, _ = mf.KF_IMU(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], thres=thres)
 
-            self.p_i += 1 
         else:
             print("End of trajectory!!")
             return nis
@@ -197,11 +197,11 @@ class robot_luft(Robot_single):
         if self.p_i < self.p_len-1:
             self.mot.predict()
             self.mot.propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
+            self.p_i += 1 
             if imu_correct:
                 nis, _= mf.KF_IMU_rom(self.mot, self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
             else:
                 nis = 1 # just some random value to avoid errrors
-            self.p_i += 1 
         else:
             print("End of trajectory!!")
             return nis
@@ -389,9 +389,9 @@ class robot_luft_multi(Robot_single):
             for i in range(self.hyp_max):
                 self.mot[i].predict()
                 self.mot[i].propagate_rom(self.s_list, self.id_num) #<--- notice rom function here
+                self.p_i += 1
                 if imu_correct:
                     nis, _= mf.KF_IMU_rom(self.mot[i], self.meas, self.imu[:,self.p_i:self.p_i+1], self.s_list, self.id_num, thres=thres)
-            self.p_i += 1 
         else:
             print("End of trajectory!!")
             return nis

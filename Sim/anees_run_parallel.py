@@ -16,14 +16,14 @@ import winsound
 dt = 0.01
 
 # Define all the paths for the robots and thus also the number of robots
-paths = [hfunc.path1_slow, hfunc.path2_slow, hfunc.path3_slow, hfunc.path4_slow, hfunc.path5_slow, hfunc.path6_slow] 
+paths = [hfunc.path1_slow, hfunc.path2_slow] 
 robot_N = len(paths)
 pos = []
 y_IMU_base = []
 x0 = []
 
 end_idx = None # can be modified for shorter trajectories
-#end_idx = round(60/dt)
+#end_idx = round(100/dt)
 
 for path in paths:
     p, imu, x = path(dt)
@@ -34,8 +34,9 @@ for path in paths:
 pos_len = pos[0].shape[1] # Assumes that all paths have the same length
 
 # Generate anchors position:
-#x_ancs = [*hfunc.anc_setup1(), *hfunc.anc_setup2()]
-x_ancs = [*hfunc.anc_setup1()]
+x_ancs = [*hfunc.anc_setup1(), *hfunc.anc_setup2()]
+#x_ancs = [*hfunc.anc_setup1()]
+#x_ancs = [hfunc.anc_setup1()[0]]
 #x_ancs = [hfunc.anc_setup5()]
 
 # %%
@@ -53,7 +54,7 @@ for i in range(len(x_ancs)):
     anchors.append(sim.Anchor(x0=x_ancs[i], id=(i+1)))
 
 # %%
-list_seeds = [1]
+list_seeds = [1061]
 #list_seeds = [1061, 1, 19001, 7871871, 2289, 91667, 8, 6119077, 47, 5514]
 seeds_num = len(list_seeds)
 
@@ -67,11 +68,11 @@ sim_max_dist = 0 # 35
 thres_anc = 15.4 # 99.5 % confidence
 thres_rob = 15.4 # 99.5 % confidence else 13.0 for df=2
 thres_IMU = 15.4 # 99.5 % confidence
-meas2_anc = True
-meas2_rob = True
-amb = True
+meas2_anc = False
+meas2_rob = False
+amb = False
 
-out_freq = np.array([[0.0],[0.0],[0.0]]) # an outlier every second on average
+out_freq = None # an outlier every second on average
 pout_r = 0
 pout_b = 0
 bias_base = np.array([[0.07],[0.2],[0.2]]) # max magnitude of bias
@@ -106,7 +107,7 @@ def run_sim_loop(j):
         robots.append( sim.robot_luft(x0=x0[i], path=pos[i], imu=y_IMU[i], dt=dt, id=111*(i+1), t=uwb_trans, R=R, P=P, Q=Q) )
         
     # Setup update params:
-    update_list = anchors + robots
+    #update_list = anchors + robots
     #params = [sr, sb, thres_anc, thres_rob, sim_max_dist, amb, meas2_anc, meas2_rob, pout_r, pout_b]
 
     # Run Lufts algorithm
@@ -117,11 +118,13 @@ def run_sim_loop(j):
         # Special rule: The first 30 seconds is used for proper initialization. It is assumed that the UAVs all have access to anchors here
         if (i*dt < 30):
             params = [sr, sb, thres_anc, thres_rob, 0, amb, meas2_anc, meas2_rob, pout_r, pout_b]
+            update_list = anchors 
         else:
             params = [sr, sb, thres_anc, thres_rob, sim_max_dist, amb, meas2_anc, meas2_rob, pout_r, pout_b]
+            update_list = anchors 
        
-       # Set up a measurement pattern similar to the used communication protocol
-        hfunc.updateAllLuft(robots, [update_list]*robot_N, [params]*robot_N, i, dt, meas_delay)
+        # Set up a measurement pattern similar to the used communication protocol
+        #hfunc.updateAllLuft(robots, [update_list]*robot_N, [params]*robot_N, i, dt, meas_delay)
     
     # Save estimates and covariances:
     return {
@@ -168,8 +171,8 @@ def main():
 
     # finally save to an pickle object:
     robotData = sldat.RobotData(x_log, P_log, nis_imu_log, nis_rb_log, ref_pos, biases, self_ids, rb_ids, anchors)
-    sldat.save_data(robotData, 'no_collab_1anc_0d_meas2')
-
+    sldat.save_data(robotData, 'imu_test', folder=r"D:\msc_data")
+    # no_collab_4anc_0d_meas1_noThres_noAmb
     # Play sound 
     winsound.MessageBeep()
 

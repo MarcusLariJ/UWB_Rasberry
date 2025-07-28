@@ -369,7 +369,8 @@ class MeasModel:
         """
         thetai = x0[X_THETA][0]
         self._H[Z_W, X_W] = 1; self._H[Z_W, X_BW] = 1
-        self._H[Z_A, X_THETA:X_THETA+1] = -RMdot(-thetai) @ x0[X_A]; self._H[Z_A, X_A] = RM(-thetai); self._H[Z_A, X_BA] = np.eye(2) 
+        #self._H[Z_A, X_THETA:X_THETA+1] = -RMdot(-thetai) @ x0[X_A]; 
+        self._H[Z_A, X_A] = RM(-thetai); self._H[Z_A, X_BA] = np.eye(2) 
 
         # Return only partial H, corresponding to IMU measurements:
         return self._H[Z_W:,:]
@@ -553,7 +554,8 @@ def _KF_ml(x: np.ndarray,
        R: np.ndarray, 
        ys: np.ndarray,
        ypred: np.ndarray,
-       radian_sel: np.ndarray):
+       radian_sel: np.ndarray,
+       zero_idx: list = None):
     """
     Computes the Kalman gain and updates the states and covariance.
     Includes the ML (now MD) step
@@ -563,6 +565,7 @@ def _KF_ml(x: np.ndarray,
         H (np.ndarray): Jacobian of output matrix
         ys (np.ndarray): matrix of possible measured outputs
         radian_sel (np.ndarray): Array indicating which states are given in radians
+        zero_idx (list): State indicies which gains to zero for Schmidt-Kalman filtering
     """
     S = H @ P @ np.transpose(H) + R
     Sinv = np.linalg.inv(S)
@@ -575,6 +578,9 @@ def _KF_ml(x: np.ndarray,
     inno = subtractState(y, ypred, r_sel)
     # Compute gain:
     K = P @ np.transpose(H) @ Sinv
+    # Zero gains for states we wish not to update (Schmidt-Kalman)
+    if zero_idx is not None:
+        K[zero_idx] = 0
     # Update state estimate
     xnew = x + K @ inno 
     # Update covariance (with Joseph form):
@@ -942,7 +948,10 @@ def _KF_relative_decen(moti: MotionModel,
     ypred = measi.h_rb(moti.x, xj, tj)
     R = measi.R[:Z_W, :Z_W] # Use only noise related to range/bearing
     rad_sel = measi.radian_sel[:Z_W]
-    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel)
+    # Apply Kalman-Scmidt filtering to bias states
+    zero_idx = [8, 9, 10, 19, 20, 21] 
+    zero_idx = None
+    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel, zero_idx)
     if thres > 0 and nis > thres:
         print("NIS too large. Skipping DECEN update")
         return xj, Pii, Pii, Pjj, cor_num, nis, K
@@ -997,7 +1006,10 @@ def _KF_relative_decen2(moti: MotionModel,
     rad_sel = np.array([[True],[True],[False]]) #TODO: not the best that this is hardcoded
     R = np.diag([measi.R[Z_PHI, Z_PHI], measi.R[Z_PHI, Z_PHI], measi.R[Z_R, Z_R]]) # TODO: #neither is this
 
-    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, 10*R, ys, ypred, rad_sel) # TODO: multiplying R with 10, to prioritize this measurements lower than anchors
+    # Apply Kalman-Scmidt filtering to bias states
+    zero_idx = [8, 9, 10, 19, 20, 21] 
+    zero_idx = None
+    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, 10*R, ys, ypred, rad_sel, zero_idx) # TODO: multiplying R with 10, to prioritize this measurements lower than anchors
     # Now, split up the results:
     if thres > 0 and nis > thres:
         print("NIS too large. Skipping DECEN2 update")
