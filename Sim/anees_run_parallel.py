@@ -75,7 +75,7 @@ amb = False
 out_freq = None # an outlier every second on average
 pout_r = 0
 pout_b = 0
-bias_base = np.array([[0.07],[0.2],[0.2]]) # max magnitude of bias
+bias_base = np.array([[0.017],[0.7],[0.7]]) # max magnitude of bias
 
 meas_delay = 0.02
 

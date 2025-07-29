@@ -369,7 +369,7 @@ class MeasModel:
         """
         thetai = x0[X_THETA][0]
         self._H[Z_W, X_W] = 1; self._H[Z_W, X_BW] = 1
-        #self._H[Z_A, X_THETA:X_THETA+1] = -RMdot(-thetai) @ x0[X_A]; 
+        self._H[Z_A, X_THETA:X_THETA+1] = -RMdot(-thetai) @ x0[X_A]; 
         self._H[Z_A, X_A] = RM(-thetai); self._H[Z_A, X_BA] = np.eye(2) 
 
         # Return only partial H, corresponding to IMU measurements:
