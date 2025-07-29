@@ -18,8 +18,8 @@ NOISE_LEN = 6
 X_THETA = 0
 X_P = slice(1,3)
 X_V = slice(3,5)
-X_BW = 6
-X_BA = slice(7,8)
+X_BW = 5
+X_BA = slice(6,8)
 X_THETA_EXT = X_THETA+STATE_LEN
 X_P_EXT = slice(1+STATE_LEN, 3+STATE_LEN)
 
@@ -311,7 +311,7 @@ class MotionModel:
         Bw = np.zeros((STATE_LEN, NOISE_LEN))
         self._A = A
         self._B = B
-        self.Bw = Bw
+        self._Bw = Bw
 
         self._x = x0
         self._radian_sel = np.array([X_THETA])
@@ -363,7 +363,7 @@ class MotionModel:
     def B(self) -> np.ndarray:
         return self._B
 
-    def f_pred(self, x0: np.ndarray, u0: np.ndarray, dt):
+    def f_pred(self, x0: np.ndarray, u0: np.ndarray, dt: float):
         """
         Prediction function
         """
@@ -371,42 +371,42 @@ class MotionModel:
         xpred = np.zeros((STATE_LEN, 1))
 
         xpred[X_THETA] = x0[X_THETA] + (u0[U_W] - x0[X_BW])*dt
-        xpred[X_P] = x0[X_P] + RM(theta)(u0[U_A] - x0[X_BA])*dt**2 + x0[X_P]*dt
-        xpred[X_V] = x0[X_V] + RM(theta)(u0[U_A] - x0[X_BA])*dt
+        xpred[X_P] = x0[X_P] + x0[X_V]*dt + RM(theta) @ (u0[U_A] - x0[X_BA])*dt**2
+        xpred[X_V] = x0[X_V] + RM(theta) @ (u0[U_A] - x0[X_BA])*dt
         xpred[X_BW] = x0[X_BW]
         xpred[X_BA] = x0[X_BA]
 
         return xpred
 
-    def get_A_B(self, x0: np.ndarray, u0: np.ndarray, dt):
+    def get_A_B(self, x0: np.ndarray, u0: np.ndarray, dt: float):
         """
         Calculate A and B matrix
         """
-        self.A = np.eye(STATE_LEN)
+        self._A = np.eye(STATE_LEN)
         theta = x0[X_THETA][0]
-        self.A(X_THETA, X_BW) = -dt
-        self.A(X_P, X_THETA) = RMdot(x0[theta])*(u0[U_A]-x0[X_BA])*dt**2; self.A[X_P, X_V] = np.eye(2)*dt; self.A[X_P, X_BA] = -RM(theta)*dt**2
-        self.A(X_V, X_THETA) = RMdot(x0[theta])*(u0[U_A]-x0[X_BA])*dt; self.A[X_V, X_BA] = -RM(theta)*dt
+        self._A[X_THETA, X_BW] = -dt
+        self._A[X_P, X_THETA:X_THETA+1] = RMdot(theta) @ (u0[U_A]-x0[X_BA])*dt**2; self.A[X_P, X_V] = np.eye(2)*dt; self.A[X_P, X_BA] = -RM(theta)*dt**2
+        self._A[X_V, X_THETA:X_THETA+1] = RMdot(theta) @ (u0[U_A]-x0[X_BA])*dt; self.A[X_V, X_BA] = -RM(theta)*dt
 
-        self.B = np.zeros((STATE_LEN, INPUT_LEN))
-        self.B[X_THETA, U_W] = dt
-        self.B[X_P, U_A] = RM(theta)*dt**2
-        self.B[X_V, U_A] = RM(theta)*dt
+        #self._B = np.zeros((STATE_LEN, INPUT_LEN))
+        #self._B[X_THETA, U_W] = dt
+        #self._B[X_P, U_A] = RM(theta)*dt**2
+        #self._B[X_V, U_A] = RM(theta)*dt
 
-        self.Bw = np.zeros((STATE_LEN, NOISE_LEN))
-        self.Bw[X_THETA, NU_W] = dt
-        self.Bw[X_P, NU_A] = RM(theta)*dt**2
-        self.Bw[X_V, NU_A] = RM(theta)*dt
-        self.Bw[X_BA, NU_BW] = dt
-        self.Bw[X_BW, NU_BW] = dt
+        self._Bw = np.zeros((STATE_LEN, NOISE_LEN))
+        self._Bw[X_THETA, NU_W] = dt
+        self._Bw[X_P, NU_A] = RM(theta)*dt**2
+        self._Bw[X_V, NU_A] = RM(theta)*dt
+        self._Bw[X_BW, NU_BW] = dt
+        self._Bw[X_BA, NU_BA] = np.eye(2)*dt
 
-        return self.A, self.B, self.Bw
+        return self._A, self._B, self._Bw
 
     def predict(self, x: np.ndarray, u: np.ndarray) -> np.ndarray:
         """
         Predict next state
         """
-        xnew = self.f_pred(x, u)
+        xnew = self.f_pred(x, u, self._dt)
         self._x = xnew
         return xnew
     
@@ -416,8 +416,8 @@ class MotionModel:
         Returns:
             Updated state covariance
         """
-        self.get_A_B(x, u)
-        Pnew = self.A @ self._P @ self.A.T + self.Bw @ self._Q @ self.Bw.T
+        self.get_A_B(x, u, self._dt)
+        Pnew = self._A @ self._P @ self._A.T + self._Bw @ self._Q @ self._Bw.T
         self._P = Pnew
         return Pnew
 

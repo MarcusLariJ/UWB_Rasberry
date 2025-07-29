@@ -42,10 +42,10 @@ class Robot_single:
                  path: np.ndarray, 
                  imu: np.ndarray,
                  id: int, 
-                 dt: float = 1.0,
-                 P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
-                 Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 0.000001, 0.00001, 0.00001]),
-                 R: np.ndarray = np.diag([0.0009, 0.001, 0.0002, 0.004, 0.004]),
+                 dt: float,
+                 P: np.ndarray,
+                 Q: np.ndarray,
+                 R: np.ndarray,
                  t: np.ndarray = np.array([[0],[0]])
                  ):
         """"
@@ -92,8 +92,8 @@ class Robot_single:
         Predict one timestep
         """
         if self.p_i < self.p_len-1:
-            x0 = self.imu[:,self.p_i:self.p_i+1]
-            u0 = self.imu[:,self.p_i]
+            x0 = self.x
+            u0 = self.imu[:,self.p_i:self.p_i+1]
             self.mot.predict(x0, u0)
             self.mot.propagate(x0, u0)
             self.p_i += 1 
@@ -162,16 +162,15 @@ class Robot_single:
 
         return inno
 
-
 class robot_luft(Robot_single):
     def __init__(self, x0: np.ndarray,
                  path: np.ndarray, 
                  imu: np.ndarray,
                  id: int,
-                 dt: float = 1.0,
-                 P: np.ndarray = np.diag([0.3, 0.002, 3.0, 3.0, 0.1, 0.1, 0.04, 0.04, 0.0001, 0.1, 0.1]),
-                 Q: np.ndarray = np.diag([0.1, 8.0, 8.0, 0.000001, 0.00001, 0.00001]),
-                 R: np.ndarray = np.diag([0.0009, 0.001, 0.0002, 0.004, 0.004]),
+                 dt: float,
+                 P: np.ndarray,
+                 Q: np.ndarray,
+                 R: np.ndarray,
                  t: np.ndarray = np.array([[0],[0]])
                  ):
         """"
@@ -187,13 +186,13 @@ class robot_luft(Robot_single):
         self.id_list = {}
         self.s_list = np.zeros((mf.STATE_LEN, mf.STATE_LEN, self.id_len)) # list for interrobot correleations (sigmaij)
 
-    def predict(self, imu_correct=True, thres=0):
+    def predict(self):
         """
         Predict one timestep
         """
         if self.p_i < self.p_len-1:
-            x0 = self.imu[:,self.p_i:self.p_i+1]
-            u0 = self.imu[:,self.p_i]
+            x0 = self.x
+            u0 = self.imu[:,self.p_i:self.p_i+1]
             self.mot.predict(x0, u0)
             self.mot.propagate_rom(x0, u0, self.s_list, self.id_num) #<--- notice rom function here
             self.p_i += 1 

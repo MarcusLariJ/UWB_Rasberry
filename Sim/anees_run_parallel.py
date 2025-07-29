@@ -15,26 +15,26 @@ import winsound
 dt = 0.01
 
 # Define all the paths for the robots and thus also the number of robots
-paths = [hfunc.path1_slow, hfunc.path2_slow] 
+paths = [hfunc.path1_slow, hfunc.path2_slow, hfunc.path3_slow, hfunc.path4_slow, hfunc.path5_slow, hfunc.path6_slow] 
 robot_N = len(paths)
 pos = []
 y_IMU_base = []
 x0 = []
 
 end_idx = None # can be modified for shorter trajectories
-end_idx = round(100/dt)
+#end_idx = round(100/dt)
 
 for path in paths:
     p, imu, x = path(dt)
     pos.append(p[:,:end_idx])
     y_IMU_base.append(imu[:,:end_idx])
-    x0.append(x)
+    x0.append(x[[0, 2, 3, 4, 5, 6, 7, 7]]) # Really trashy way of copying states
 
 pos_len = pos[0].shape[1] # Assumes that all paths have the same length
 
 # Generate anchors position:
-x_ancs = [*hfunc.anc_setup1(), *hfunc.anc_setup2()]
-#x_ancs = [*hfunc.anc_setup1()]
+#x_ancs = [*hfunc.anc_setup1(), *hfunc.anc_setup2()]
+x_ancs = [*hfunc.anc_setup1()]
 #x_ancs = [hfunc.anc_setup1()[0]]
 #x_ancs = [hfunc.anc_setup5()]
 
@@ -44,9 +44,9 @@ R_r =  0.0008 # old value from datasheet # 0.001
 R_w = 0.00002
 R_a = 0.001
 
-R = np.diag([R_b, R_r, R_w, R_a, R_a])
-Q = np.diag([0.1, 8.0, 8.0, 1e-8, 1e-7, 1e-7])
-P = np.diag([0.1, 0.001, 1.0, 1.0, 0.1, 0.1, 0.01, 0.01, 0.0001, 0.1, 0.1])
+R = np.diag([R_b, R_r])
+Q = np.diag([R_w, R_a, R_a, 1e-8, 1e-7, 1e-7])
+P = np.diag([0.1, 1.0, 1.0, 0.1, 0.1, 0.0001, 0.1, 0.1])
 
 anchors = []
 for i in range(len(x_ancs)):
@@ -66,22 +66,20 @@ uwb_trans = np.array([[0.1],[0.0]])
 sim_max_dist = 0 # 35
 thres_anc = 15.4 # 99.5 % confidence
 thres_rob = 15.4 # 99.5 % confidence else 13.0 for df=2
-thres_IMU = 15.4 # 99.5 % confidence
-meas2_anc = False
-meas2_rob = False
+meas2_anc = True
+meas2_rob = True
 amb = False
 
 out_freq = None # an outlier every second on average
 pout_r = 0
 pout_b = 0
-bias_base = np.array([[0.07],[0.2],[0.2]]) # max magnitude of bias
+bias_base = np.array([[0.017],[0.7],[0.7]]) # max magnitude of bias
 
 meas_delay = 0.02
 
 # Quick disabling of settings 
 thres_anc = 0
 thres_rob = 0
-thres_IMU = 0
 #bias_base = np.array([[0.0],[0.0],[0.0]]) 
 #sr=0
 #sb=0
@@ -112,7 +110,7 @@ def run_sim_loop(j):
     # Run Lufts algorithm
     for i in range(pos_len-1):
         for r in robots:
-            r.predict(imu_correct=True, thres=thres_IMU)
+            r.predict()
         
         # Special rule: The first 30 seconds is used for proper initialization. It is assumed that the UAVs all have access to anchors here
         if (i*dt < 30):
@@ -120,7 +118,7 @@ def run_sim_loop(j):
             update_list = anchors 
         else:
             params = [sr, sb, thres_anc, thres_rob, sim_max_dist, amb, meas2_anc, meas2_rob, pout_r, pout_b]
-            update_list = anchors 
+            update_list = anchors + robots
        
         # Set up a measurement pattern similar to the used communication protocol
         #hfunc.updateAllLuft(robots, [update_list]*robot_N, [params]*robot_N, i, dt, meas_delay)

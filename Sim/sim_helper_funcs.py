@@ -9,39 +9,39 @@ def anc_setup1():
     """
         Anchors in each corner of the arena
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[-np.pi/4],[0],[1],[69]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[3*np.pi/4],[0],[99],[1]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:3] = np.array([[-np.pi/4],[1],[69]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:3] = np.array([[3*np.pi/4],[99],[1]])
     return xanc1, xanc2
 
 def anc_setup2():
     """
         Anchor in the other corners of the arena
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[np.pi/4],[0],[1],[1]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[-3*np.pi/4],[0],[99],[69]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:3] = np.array([[np.pi/4],[1],[1]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:3] = np.array([[-3*np.pi/4],[99],[69]])
     return xanc1, xanc2
 
 def anc_setup3():
     """
         Anchors clumped close together    
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[1],[65]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[0],[0],[5],[69]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:3] = np.array([[0],[1],[65]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:3] = np.array([[0],[5],[69]])
     return xanc1, xanc2
 
 def anc_setup4():
     """
         Anchors in the middle
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[45],[35]])
-    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:4] = np.array([[0],[0],[55],[35]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:3] = np.array([[0],[45],[35]])
+    xanc2 = np.zeros((mf.STATE_LEN, 1)); xanc2[:3] = np.array([[0],[55],[35]])
     return xanc1, xanc2
 
 def anc_setup5():
     """
         Anchor in the middle
     """
-    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:4] = np.array([[0],[0],[50],[35]])
+    xanc1 = np.zeros((mf.STATE_LEN, 1)); xanc1[:3] = np.array([[0],[50],[35]])
     return xanc1
 
 ########### different trajectories pre-defined ##############
