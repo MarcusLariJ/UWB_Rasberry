@@ -926,7 +926,7 @@ def _KF_relative_decen2(moti: MotionModel,
     # Apply Kalman-Scmidt filtering to bias states
     zero_idx = [8, 9, 10, 19, 20, 21] 
     zero_idx = None
-    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, 10*R, ys, ypred, rad_sel, zero_idx) # TODO: multiplying R with 10, to prioritize this measurements lower than anchors
+    xnew, Pnew, nis, K = _KF_ml(xa, Paa, Ha, R, ys, ypred, rad_sel, zero_idx) # TODO: multiplying R with 10, to prioritize this measurements lower than anchors
     # Now, split up the results:
     if thres > 0 and nis > thres:
         print("NIS too large. Skipping DECEN2 update")

@@ -33,9 +33,8 @@ for path in paths:
 pos_len = pos[0].shape[1] # Assumes that all paths have the same length
 
 # Generate anchors position:
-#x_ancs = [*hfunc.anc_setup1(), *hfunc.anc_setup2()]
-x_ancs = [*hfunc.anc_setup1()]
-#x_ancs = [hfunc.anc_setup1()[0]]
+x_ancs = [*hfunc.anc_setup1(), *hfunc.anc_setup2()]
+#x_ancs = [*hfunc.anc_setup1()]
 #x_ancs = [hfunc.anc_setup5()]
 
 # %%
@@ -46,15 +45,15 @@ R_a = 0.001
 
 R = np.diag([R_b, R_r])
 Q = np.diag([R_w, R_a, R_a, 1e-8, 1e-7, 1e-7])
-P = np.diag([0.1, 1.0, 1.0, 0.1, 0.1, 0.0001, 0.1, 0.1])
+P = np.diag([0.1, 1.0, 1.0, 0.1, 0.1, 0.001, 1.0, 1.0]) #0.0001 for w
 
 anchors = []
 for i in range(len(x_ancs)):
     anchors.append(sim.Anchor(x0=x_ancs[i], id=(i+1)))
 
 # %%
-list_seeds = [1061]
-#list_seeds = [1061, 1, 19001, 7871871, 2289, 91667, 8, 6119077, 47, 5514]
+#list_seeds = [1061]
+list_seeds = [1061, 1, 19001, 7871871, 2289, 91667, 8, 6119077, 47, 5514]
 seeds_num = len(list_seeds)
 
 # Sim settings
@@ -121,7 +120,7 @@ def run_sim_loop(j):
             update_list = anchors + robots
        
         # Set up a measurement pattern similar to the used communication protocol
-        #hfunc.updateAllLuft(robots, [update_list]*robot_N, [params]*robot_N, i, dt, meas_delay)
+        hfunc.updateAllLuft(robots, [update_list]*robot_N, [params]*robot_N, i, dt, meas_delay)
     
     # Save estimates and covariances:
     return {
@@ -168,7 +167,7 @@ def main():
 
     # finally save to an pickle object:
     robotData = sldat.RobotData(x_log, P_log, 0, nis_rb_log, ref_pos, biases, self_ids, rb_ids, anchors)
-    sldat.save_data(robotData, 'imu_test', folder=r"D:\msc_data")
+    sldat.save_data(robotData, 'collab_4anc_0d_meas2_noThres_noAmb', folder=r"D:\msc_data")
     # no_collab_4anc_0d_meas1_noThres_noAmb
     # Play sound 
     winsound.MessageBeep()
