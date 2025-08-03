@@ -64,8 +64,8 @@ def plot_position(ax: plt.Axes, x: np.ndarray, color = 'b', draw_arrow=True, mar
     py = x[2,:]
 
     ax.plot(px, py, color=color, marker=marker, linestyle=linestyle, label=label)
-    ax.scatter(px, py, c=color, s=1.5)
     if draw_arrow:
+        ax.scatter(px, py, c=color, s=1.5)
         for i in range(len):
             ax.arrow(px[i], 
                      py[i], 

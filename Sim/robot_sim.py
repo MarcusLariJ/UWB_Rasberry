@@ -249,6 +249,9 @@ class robot_luft(Robot_single):
         if thres > 0 and nis > thres:
             self.out_num = min(self.out_num+1, 20)
             print("Num of outliers increased to " + str(self.out_num))
+            if self.out_num == 20:
+                self.sensor_reset()
+                self.out_num = 0
         else:
             self.out_num = max(self.out_num-1, 0)
         # Log updated quantities:        
@@ -313,6 +316,9 @@ class robot_luft(Robot_single):
         if thres > 0 and nis > thres:
             self.out_num = min(self.out_num+1, 20)
             print("Num of outliers increased to " + str(self.out_num))
+            if self.out_num == 20:
+                self.sensor_reset()
+                self.out_num = 0
             # Dont send updated quantities back
         else:
             self.out_num = max(self.out_num-1, 0)
@@ -344,6 +350,19 @@ class robot_luft(Robot_single):
         idi = self.id
         ti = self.t
         return xi, Pii, sigmaij, idi, ti
+
+    def sensor_reset(self):
+        """
+            Perform a reset of the system (except biases)
+        """
+        print("** PERFORMING RESET **")
+        # Reset covariances
+        #+- 180 deg, 50 m, 10 m/s, same as initialization 
+        self.mot.P = np.diag([1.5, 300, 300, 5, 5, 0.001, 1.0, 1.0])
+        # Reset all correlations
+        for i in range(self.id_num):
+            self.s_list[:,:,i] = np.zeros(mf.STATE_LEN)
+
 
 ########### Error functions ###############
 

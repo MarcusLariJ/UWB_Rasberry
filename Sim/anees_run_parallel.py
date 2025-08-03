@@ -15,7 +15,7 @@ import winsound
 dt = 0.01
 
 # Define all the paths for the robots and thus also the number of robots
-paths = [hfunc.path1_slow, hfunc.path2_slow, hfunc.path3_slow, hfunc.path4_slow, hfunc.path5_slow, hfunc.path6_slow] 
+paths = [hfunc.path1_slow, hfunc.path2_slow, hfunc.path3_slow] 
 robot_N = len(paths)
 pos = []
 y_IMU_base = []
@@ -52,8 +52,8 @@ for i in range(len(x_ancs)):
     anchors.append(sim.Anchor(x0=x_ancs[i], id=(i+1)))
 
 # %%
-#list_seeds = [1061]
-list_seeds = [1061, 1, 19001, 7871871, 2289, 91667, 8, 6119077, 47, 5514]
+list_seeds = [1061]
+#list_seeds = [1061, 1, 19001, 7871871, 2289, 91667, 8, 6119077, 47, 5514]
 seeds_num = len(list_seeds)
 
 # Sim settings
@@ -62,12 +62,12 @@ sb = R_b
 r_w = R_w
 r_a = R_a
 uwb_trans = np.array([[0.1],[0.0]])
-sim_max_dist = 0 # 35
+sim_max_dist = 20 # 35
 thres_anc = 15.4 # 99.5 % confidence
 thres_rob = 15.4 # 99.5 % confidence else 13.0 for df=2
 meas2_anc = True
 meas2_rob = True
-amb = False
+amb = True
 
 out_freq = None # an outlier every second on average
 pout_r = 0
@@ -77,8 +77,8 @@ bias_base = np.array([[0.017],[0.7],[0.7]]) # max magnitude of bias
 meas_delay = 0.02
 
 # Quick disabling of settings 
-thres_anc = 0
-thres_rob = 0
+#thres_anc = 0
+#thres_rob = 0
 #bias_base = np.array([[0.0],[0.0],[0.0]]) 
 #sr=0
 #sb=0
@@ -167,7 +167,7 @@ def main():
 
     # finally save to an pickle object:
     robotData = sldat.RobotData(x_log, P_log, 0, nis_rb_log, ref_pos, biases, self_ids, rb_ids, anchors)
-    sldat.save_data(robotData, 'collab_4anc_0d_meas2_noThres_noAmb', folder=r"D:\msc_data")
+    sldat.save_data(robotData, 'test_reset', folder=r"D:\msc_data")
     # no_collab_4anc_0d_meas1_noThres_noAmb
     # Play sound 
     winsound.MessageBeep()
