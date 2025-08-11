@@ -371,7 +371,7 @@ class MotionModel:
         xpred = np.zeros((STATE_LEN, 1))
 
         xpred[X_THETA] = x0[X_THETA] + (u0[U_W] - x0[X_BW])*dt
-        xpred[X_P] = x0[X_P] + x0[X_V]*dt + RM(theta) @ (u0[U_A] - x0[X_BA])*dt**2
+        xpred[X_P] = x0[X_P] + x0[X_V]*dt + (1.0/2.0)*(RM(theta) @ (u0[U_A] - x0[X_BA]))*dt**2
         xpred[X_V] = x0[X_V] + RM(theta) @ (u0[U_A] - x0[X_BA])*dt
         xpred[X_BW] = x0[X_BW]
         xpred[X_BA] = x0[X_BA]
@@ -385,7 +385,7 @@ class MotionModel:
         self._A = np.eye(STATE_LEN)
         theta = x0[X_THETA][0]
         self._A[X_THETA, X_BW] = -dt
-        self._A[X_P, X_THETA:X_THETA+1] = RMdot(theta) @ (u0[U_A]-x0[X_BA])*dt**2; self.A[X_P, X_V] = np.eye(2)*dt; self.A[X_P, X_BA] = -RM(theta)*dt**2
+        self._A[X_P, X_THETA:X_THETA+1] = (1.0/2.0)*(RMdot(theta) @ (u0[U_A]-x0[X_BA]))*dt**2; self.A[X_P, X_V] = np.eye(2)*dt; self.A[X_P, X_BA] = -(1.0/2.0)*RM(theta)*dt**2
         self._A[X_V, X_THETA:X_THETA+1] = RMdot(theta) @ (u0[U_A]-x0[X_BA])*dt; self.A[X_V, X_BA] = -RM(theta)*dt
 
         #self._B = np.zeros((STATE_LEN, INPUT_LEN))
@@ -395,7 +395,7 @@ class MotionModel:
 
         self._Bw = np.zeros((STATE_LEN, NOISE_LEN))
         self._Bw[X_THETA, NU_W] = dt
-        self._Bw[X_P, NU_A] = RM(theta)*dt**2
+        self._Bw[X_P, NU_A] = (1.0/2.0)*RM(theta)*dt**2
         self._Bw[X_V, NU_A] = RM(theta)*dt
         self._Bw[X_BW, NU_BW] = dt
         self._Bw[X_BA, NU_BA] = np.eye(2)*dt

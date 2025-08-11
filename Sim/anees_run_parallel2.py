@@ -52,8 +52,8 @@ for i in range(len(x_ancs)):
     anchors.append(sim.Anchor(x0=x_ancs[i], id=(i+1)))
 
 # %%
+#list_seeds = [1061]
 list_seeds = [1061, 1, 19001, 7871871, 2289, 91667, 8, 6119077, 47, 5514]
-#list_seeds = [1061, 1, 19001, 7871871, 2289, 91667, 8, 6119077, 47, 5514]
 seeds_num = len(list_seeds)
 
 # Sim settings
@@ -62,12 +62,12 @@ sb = R_b
 r_w = R_w
 r_a = R_a
 uwb_trans = np.array([[0.1],[0.0]])
-sim_max_dist = 50 # 35
+sim_max_dist = 0 # 35
 thres_anc = 6 # 99.7 % confidence
 thres_rob = 0 # 99.7 % confidence else 13.0 for df=2
 meas2_anc = True
 meas2_rob = True
-amb = True
+amb = False
 
 out_freq = None # an outlier every second on average
 pout_r = 0
@@ -103,8 +103,13 @@ def run_sim_loop(j):
         robots.append( sim.robot_luft(x0=x0[i], path=pos[i], imu=y_IMU[i], dt=dt, id=111*(i+1), t=uwb_trans, R=R, P=P, Q=Q) )
         
     # Setup update params:
-    #update_list = anchors + robots
-    #params = [sr, sb, thres_anc, thres_rob, sim_max_dist, amb, meas2_anc, meas2_rob, pout_r, pout_b]
+    update_post = [None]*robot_N
+    update_post[0] = anchors
+    update_post[1] = [robots[0]]
+    update_post[2] = [robots[1]] 
+    update_post[3] = [robots[2]]
+    update_post[4] = [robots[3]]
+    update_post[5] = [robots[4]]
 
     # Run Lufts algorithm
     for i in range(pos_len-1):
@@ -114,21 +119,14 @@ def run_sim_loop(j):
         # Special rule: The first 30 seconds is used for proper initialization. It is assumed that the UAVs all have access to anchors here
         if (i*dt < 30):
             params = [sr, sb, thres_anc, thres_rob, 0, amb, meas2_anc, meas2_rob, pout_r, pout_b]
-            update_list = anchors 
-        elif (30 <= i*dt and i*dt <= 100):
-            # Special rule: robots + anchors
-            params = [sr, sb, thres_anc, thres_rob, sim_max_dist, amb, meas2_anc, meas2_rob, pout_r, pout_b]
-            update_list = anchors + robots         
-        elif (100 < i*dt and i*dt < 400):
-            # Special rule: Anchor + robots outage
-            params = [sr, sb, thres_anc, thres_rob, sim_max_dist, amb, meas2_anc, meas2_rob, pout_r, pout_b]
-            update_list = [None]*10
+            update_list = [anchors]*robot_N 
         else:
             params = [sr, sb, thres_anc, thres_rob, sim_max_dist, amb, meas2_anc, meas2_rob, pout_r, pout_b]
-            update_list = anchors + [None]*6
+            # Only update specific robots
+            update_list = update_post
        
         # Set up a measurement pattern similar to the used communication protocol
-        hfunc.updateAllLuft(robots, [update_list]*robot_N, [params]*robot_N, i, dt, meas_delay)
+        hfunc.updateAllLuft(robots, update_list, [params]*robot_N, i, dt, meas_delay)
     
     # Save estimates and covariances:
     return {
@@ -175,7 +173,7 @@ def main():
 
     # finally save to an pickle object:
     robotData = sldat.RobotData(x_log, P_log, 0, nis_rb_log, ref_pos, biases, self_ids, rb_ids, anchors)
-    sldat.save_data(robotData, 'no_collab_4anc_50d_meas2_noThres_Amb_outage300s', folder=r"D:\msc_data")
+    sldat.save_data(robotData, 'collab_4anc_0d_meas2_noThres_noAmb_prop3', folder=r"D:\msc_data")
     # collab_4anc_50d_meas2_noThres_Amb
     # Play sound 
     winsound.MessageBeep()

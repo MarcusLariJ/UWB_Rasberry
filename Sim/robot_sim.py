@@ -8,6 +8,8 @@ from scipy.stats.distributions import chi2
 # Module that features different robot models
 # and error metrics
 
+NIS_WIN = 10
+
 class Anchor:
     def __init__(self, x0: np.ndarray,
                  t: np.ndarray = np.array([[0],[0]]),
@@ -69,7 +71,8 @@ class Robot_single:
         self.rb_ids = np.zeros(self.p_len) # Keeps track of the robot/anchors we communicated with
 
         # For divergence checking:
-        self.out_num = 0 # increases for each outlier encountered
+        self.nis_hist = np.zeros(NIS_WIN) # window of ten
+        self.nis_idx = 0 # which index to fill
 
         # Init models
         self.mot = mf.MotionModel(x0 = x0, dt=dt, P=P, Q=Q)
@@ -242,18 +245,11 @@ class robot_luft(Robot_single):
         # Else: anchor within range:
         print("Robot " + str(self.id) + " sees anchor " + str(a.id) + " at time " + str(self.p_i*self.dt))
         if meas2:
-            nis, _ = mf.KF_rb_rom2(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
+            nis, _ = mf.KF_rb_rom2(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=0)
         else:
-            nis, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=thres)
-        # Update number of outliers:
-        if thres > 0 and nis > thres:
-            self.out_num = min(self.out_num+1, 20)
-            print("Num of outliers increased to " + str(self.out_num))
-            if self.out_num == 20:
-                self.sensor_reset()
-                self.out_num = 0
-        else:
-            self.out_num = max(self.out_num-1, 0)
+            nis, _ = mf.KF_rb_rom(self.mot, a.mot.x, self.meas, a.meas.t, ys, self.s_list, self.id_num, thres=0)
+        # Check if systems is inconsistent:
+        self.check_reset(nis, thres)
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
@@ -309,22 +305,15 @@ class robot_luft(Robot_single):
                                                                 self.id_list,
                                                                 self.s_list,
                                                                 self.id_num,
-                                                                thres=thres,
+                                                                thres=0,
                                                                 meas2=meas2)
         self.id_num = cor_num
-        # Update number of outliers:
-        if thres > 0 and nis > thres:
-            self.out_num = min(self.out_num+1, 20)
-            print("Num of outliers increased to " + str(self.out_num))
-            if self.out_num == 20:
-                self.sensor_reset()
-                self.out_num = 0
-            # Dont send updated quantities back
-        else:
-            self.out_num = max(self.out_num-1, 0)
+        # Check if systems is inconsistent:
+        res = self.check_reset(nis, thres)
+        # If system is still consistent, then perform correction
+        if not res:
             # send updated quantities back to j
             r.recieve_update(xj_new, Pjj_new, self.id)
-
         # Log updated quantities:        
         self.x_log[:,self.p_i:self.p_i+1] = self.x
         self.P_log[:,:,self.p_i] = self.P
@@ -351,18 +340,29 @@ class robot_luft(Robot_single):
         ti = self.t
         return xi, Pii, sigmaij, idi, ti
 
-    def sensor_reset(self):
+    def check_reset(self, nis: float, thres: float):
         """
-            Perform a reset of the system (except biases)
+            Perform a reset of the system 
         """
-        print("** PERFORMING RESET **")
-        # Reset covariances
-        #+- 180 deg, 50 m, 10 m/s, same as initialization 
-        self.mot.P = np.diag([1.5, 300, 300, 5, 5, 0.001, 1.0, 1.0])
-        # Reset all correlations
-        for i in range(self.id_num):
-            self.s_list[:,:,i] = np.zeros(mf.STATE_LEN)
-
+        if thres > 0:
+            self.nis_hist[self.nis_idx] = nis
+            anis = (1/NIS_WIN)*np.sum(self.nis_hist)
+            self.nis_idx = (self.nis_idx + 1) % NIS_WIN
+            # Check if ANIS too high:
+            if (anis > thres):
+                print("** PERFORMING RESET **")
+                # Reset nis history
+                self.nis_hist[:] = 0
+                # Reset covariances, except for biases
+                #+- 180 deg, 50 m, 10 m/s
+                temp = np.diag([1.5, 300, 300, 5, 5, 0, 0, 0])
+                temp[mf.X_BW:,mf.X_BW:] = self.P[mf.X_BW:,mf.X_BW:]
+                self.mot.P = temp
+                # Reset all correlations
+                for i in range(self.id_num):
+                    self.s_list[:,:,i] = np.zeros(mf.STATE_LEN)
+                return True
+        return False
 
 ########### Error functions ###############
 
@@ -429,16 +429,7 @@ def NEES(x_est: np.ndarray,
     a = 1-prob
     if x_num == P_num:
         t = np.linspace(0, x_num*dt, x_num)
-        check_inv = True
         for i in range(x_num):
-            if check_inv:
-                # Initially, the P matrix is not invertible (fx all 0s). 
-                # Make a check just in case for the first few cases:
-                if np.linalg.det(P[:,:,i]) == 0:
-                    nees[i] = -1
-                    continue
-                else:
-                    check_inv = False 
             nees[i] = x[:,i:i+1].T @ np.linalg.inv(P[:,:,i]) @ x[:,i:i+1]
         # Calculate thresholds:
         r1 = chi2.ppf(a/2.0, df=x_len)

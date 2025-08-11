@@ -5,9 +5,8 @@ import matplotlib.patches as patch
 import numpy as np
 
 
-def setup_plot(x=[0, 100], y=[0,70], figsize=(10,7)) -> tuple[plt.Figure, plt.Axes]:
+def setup_plot(x=[0, 100], y=[0,70], figsize=(6,4)) -> tuple[plt.Figure, plt.Axes]:
     fig, ax = plt.subplots(figsize=figsize)
-    ax.set_title("Robot trajectory")
     ax.set_xlabel("x [m]")
     ax.set_ylabel("y [m]")
     ax.set_xlim((x[0],x[1]))
@@ -16,6 +15,7 @@ def setup_plot(x=[0, 100], y=[0,70], figsize=(10,7)) -> tuple[plt.Figure, plt.Ax
     ax.tick_params(direction='in')
     ax.set_xticks(np.arange(x[0], x[1]+1, 10))
     ax.set_yticks(np.arange(y[0]+10, y[1]+1, 10))
+    ax.spines[['right', 'top']].set_visible(False)
 
     return fig, ax
 
