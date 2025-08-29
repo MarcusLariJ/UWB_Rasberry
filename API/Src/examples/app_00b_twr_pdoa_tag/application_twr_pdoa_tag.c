@@ -132,7 +132,7 @@ enum state_t {
 enum state_t state = TWR_PRELOAD_SYNC_ANC;
 
 /* timeout before the ranging exchange will be abandoned and restarted */
-static const uint64_t round_delay_us = 1200; // reply time (1.5ms)
+static const uint64_t round_delay_us = 2000; // reply time (1.5ms)
 static const uint64_t round_tx_delay = round_delay_us*US_TO_DWT_TIME; // reply time in dut 
   			 uint64_t tag_sync_timeout = round_delay_us+500; //(1.5 ms) How much time before the tag stops looking for a response (us)
 static const uint64_t anc_resp_timeout = round_delay_us+500; //(1.5 ms) How much time before the anchor stops looking for a response (us)
@@ -707,7 +707,7 @@ int application_twr_pdoa_tag(void)
 				printf("RX: Final frame\n");
 			
 				/* Transmit measurement data */
-				//current_rotation = getAngle(); // for debugging. Reanble for PDoA tests
+				current_rotation = getAngle(); // for debugging. Reanble for PDoA tests
 				pdoa_rx = dwt_readpdoa();
 				//dwt_readtdoa(tdoa_rx); // the tdoa measurements are pretty much useless, since antennas are too close. This can be removed
 
